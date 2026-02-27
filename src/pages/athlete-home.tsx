@@ -44,7 +44,7 @@ function AthleteHomeInner() {
     ? profile.subscriptionExpiresAt
     : null;
 
-  const isExpired = subscriptionExpiry && subscriptionExpiry < new Date();
+  const isExpired = !!(subscriptionExpiry && subscriptionExpiry < new Date());
   const daysUntilExpiry = subscriptionExpiry
     ? Math.ceil((subscriptionExpiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     : null;
@@ -92,7 +92,11 @@ function AthleteHomeInner() {
         {/* Weeks List */}
         <div className="card" style={{ marginTop: 20 }}>
           <h2>Settimane di Programma</h2>
-          {loading ? (
+          {isExpired ? (
+            <div style={{ marginTop: 12, color: "#ff6b6b" }}>
+              Abbonamento scaduto: non puoi visualizzare le settimane finché il coach non rinnova l'abbonamento.
+            </div>
+          ) : loading ? (
             <div style={{ marginTop: 12, opacity: 0.8 }}>Caricamento...</div>
           ) : weeks.length === 0 ? (
             <div style={{ marginTop: 12, opacity: 0.8 }}>

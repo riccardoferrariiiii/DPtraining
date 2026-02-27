@@ -28,6 +28,7 @@ type Athlete = {
   firstName?: string;
   lastName?: string;
   email?: string;
+  subscriptionExpiresAt?: any;
 };
 
 type AssignedWeek = {
@@ -35,6 +36,15 @@ type AssignedWeek = {
   title: string;
   templateId: string;
 };
+
+function isSubscriptionExpired(raw: any) {
+  const expiry = raw?.toDate?.() instanceof Date
+    ? raw.toDate()
+    : raw instanceof Date
+    ? raw
+    : null;
+  return !!(expiry && expiry < new Date());
+}
 
 export default function CoachTemplates() {
   return (
@@ -85,6 +95,7 @@ function CoachTemplatesInner() {
       firstName: (d.data() as any).firstName,
       lastName: (d.data() as any).lastName,
       email: (d.data() as any).email,
+      subscriptionExpiresAt: (d.data() as any).subscriptionExpiresAt,
     }));
     setAthletes(list);
     setSelectedAthletes(new Set());
@@ -248,10 +259,23 @@ function CoachTemplatesInner() {
     const template = templates.find((t) => t.id === selectedTemplateId);
     if (!template) return;
 
+    const selected = Array.from(selectedAthletes);
+    const assignableAthletes = selected.filter((uid) => {
+      const athlete = athletes.find((a) => a.uid === uid);
+      return athlete && !isSubscriptionExpired(athlete.subscriptionExpiresAt);
+    });
+    const skippedCount = selected.length - assignableAthletes.length;
+
+    if (assignableAthletes.length === 0) {
+      setConfirmMessage("Tutti gli atleti selezionati hanno l'abbonamento scaduto.");
+      setConfirmType("warning");
+      return;
+    }
+
     setAssigningAthletes(true);
     try {
       await Promise.all(
-        Array.from(selectedAthletes).map((uid) =>
+        assignableAthletes.map((uid) =>
           addDoc(collection(db, "users", uid, "weeks"), {
             templateId: selectedTemplateId,
             title: template.title,
@@ -261,7 +285,11 @@ function CoachTemplatesInner() {
         )
       );
 
-      setConfirmMessage(`Settimana assegnata a ${selectedAthletes.size} atleta/i`);
+      setConfirmMessage(
+        skippedCount > 0
+          ? `Settimana assegnata a ${assignableAthletes.length} atleta/i (${skippedCount} esclusi: abbonamento scaduto).`
+          : `Settimana assegnata a ${assignableAthletes.length} atleta/i`
+      );
       setConfirmType('success');
       setShowModal(false);
       setSelectedAthletes(new Set());
@@ -404,6 +432,8 @@ function CoachTemplatesInner() {
                   const alreadyHasThisWeek = (athleteAssignedWeeks[a.uid] || []).some(
                     (w) => w.templateId === selectedTemplateId
                   );
+                  const isExpired = isSubscriptionExpired(a.subscriptionExpiresAt);
+                  const isBlocked = alreadyHasThisWeek || isExpired;
                   const assignedWeeks = athleteAssignedWeeks[a.uid] || [];
 
                   return (
@@ -415,7 +445,11 @@ function CoachTemplatesInner() {
                           justifyContent: "space-between",
                           gap: 10,
                           padding: 10,
-                          backgroundColor: alreadyHasThisWeek ? "rgba(76, 175, 80, 0.1)" : "rgba(245, 245, 247, 0.05)",
+                          backgroundColor: isExpired
+                            ? "rgba(239, 68, 68, 0.12)"
+                            : alreadyHasThisWeek
+                            ? "rgba(76, 175, 80, 0.1)"
+                            : "rgba(245, 245, 247, 0.05)",
                           borderRadius: 6,
                         }}
                       >
@@ -424,8 +458,8 @@ function CoachTemplatesInner() {
                             display: "flex",
                             alignItems: "center",
                             gap: 10,
-                            cursor: alreadyHasThisWeek ? "not-allowed" : "pointer",
-                            opacity: alreadyHasThisWeek ? 0.7 : 1,
+                            cursor: isBlocked ? "not-allowed" : "pointer",
+                            opacity: isBlocked ? 0.7 : 1,
                             flex: 1,
                           }}
                         >
@@ -433,15 +467,16 @@ function CoachTemplatesInner() {
                             type="checkbox"
                             checked={selectedAthletes.has(a.uid) || alreadyHasThisWeek}
                             onChange={() => {
-                              if (!alreadyHasThisWeek) toggleAthlete(a.uid);
+                              if (!isBlocked) toggleAthlete(a.uid);
                             }}
-                            disabled={alreadyHasThisWeek}
-                            style={{ cursor: alreadyHasThisWeek ? "not-allowed" : "pointer" }}
+                            disabled={isBlocked}
+                            style={{ cursor: isBlocked ? "not-allowed" : "pointer" }}
                           />
                           <span>
                             {a.firstName && a.lastName
                               ? `${a.firstName} ${a.lastName}`
                               : a.email || "Atleta"}
+                            {isExpired && " ⚠️ (abbonamento scaduto)"}
                             {alreadyHasThisWeek && " ✓ (già assegnata)"}
                           </span>
                         </label>

@@ -5,6 +5,7 @@ import { Guard } from '../../components/Guard';
 import { TopBar } from '../../components/TopBar';
 import { db } from '../../lib/firebase';
 import { paths } from '../../lib/paths';
+import { useSession } from '../../lib/session';
 
 function WorkoutResultForm({ athleteUid, weekId, weekTitle, dayId, dayLabel, workout }: any) {
   const [weightKg, setWeight] = useState('');
@@ -167,16 +168,28 @@ function WorkoutResultForm({ athleteUid, weekId, weekTitle, dayId, dayLabel, wor
 
 export default function Day() {
   const router = useRouter();
+  const { profile } = useSession();
   const weekId = (router.query.weekId as string) || '';
   const dayId = (router.query.dayId as string) || '';
   const [day, setDay] = useState<any>(null);
   const [week, setWeek] = useState<any>(null);
   const [workouts, setWorkouts] = useState<any[]>([]);
 
+  const subscriptionExpiry = profile?.subscriptionExpiresAt?.toDate?.()
+    ? new Date(profile.subscriptionExpiresAt.toDate())
+    : profile?.subscriptionExpiresAt instanceof Date
+    ? profile.subscriptionExpiresAt
+    : null;
+  const isExpired = !!(subscriptionExpiry && subscriptionExpiry < new Date());
+
   return (
     <Guard>
       {({ user }: any) => {
         useEffect(() => {
+          if (isExpired) {
+            setWorkouts([]);
+            return;
+          }
           if (!weekId || !dayId) return;
           const wref = doc(db, `users/${user.uid}/weeks/${weekId}`);
           const unsubWeek = onSnapshot(wref, (s) => setWeek({ id: s.id, ...s.data() }));
@@ -185,7 +198,7 @@ export default function Day() {
           const q = query(collection(db, paths.workouts(user.uid, weekId, dayId)), orderBy('order', 'asc'));
           const unsubW = onSnapshot(q, (snap) => setWorkouts(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
           return () => { unsubWeek(); unsubDay(); unsubW(); };
-        }, [user.uid, weekId, dayId]);
+        }, [isExpired, user.uid, weekId, dayId]);
 
         const pageTitle = week?.title && day?.label 
           ? `${week.title} • ${day.label}` 
@@ -195,7 +208,11 @@ export default function Day() {
           <>
             <TopBar title={pageTitle} />
             <div className="container">
-              {workouts.length === 0 ? (
+              {isExpired ? (
+                <div className="card" style={{ marginTop: 16, color: '#ff6b6b' }}>
+                  Abbonamento scaduto: non puoi visualizzare le settimane.
+                </div>
+              ) : workouts.length === 0 ? (
                 <div className="card">
                   <div className="badge">Rest day</div>
                   <h1 className="h1">Nessun workout oggi</h1>

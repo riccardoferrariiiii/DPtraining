@@ -36,6 +36,15 @@ function toDateInputValue(d: Date) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function isSubscriptionExpired(raw: any) {
+  const expiry = raw?.toDate?.() instanceof Date
+    ? raw.toDate()
+    : raw instanceof Date
+    ? raw
+    : null;
+  return !!(expiry && expiry < new Date());
+}
+
 export default function CoachAthletes() {
   return (
     <RoleGuard role="coach">
@@ -122,7 +131,15 @@ function CoachAthletesInner() {
     });
   };
 
-  const assignTemplateToAthlete = async (uid: string) => {
+  const assignTemplateToAthlete = async (athlete: Athlete) => {
+    const uid = athlete.uid;
+
+    if (isSubscriptionExpired(athlete.subscriptionExpiresAt)) {
+      setConfirmMessage("Abbonamento atleta scaduto: non puoi assegnare settimane.");
+      setConfirmType("warning");
+      return;
+    }
+
     if (!selectedTemplate) {
       setConfirmMessage("Nessun template selezionato.");
       setConfirmType("error");
@@ -182,6 +199,7 @@ function CoachAthletesInner() {
 
         {athletes.map((a) => {
           const alreadyAssigned = !!alreadyAssignedMap[a.uid];
+          const expired = isSubscriptionExpired(a.subscriptionExpiresAt);
           const expiry =
             a.subscriptionExpiresAt?.toDate?.() instanceof Date
               ? a.subscriptionExpiresAt.toDate()
@@ -214,11 +232,17 @@ function CoachAthletesInner() {
 
                 <button
                   className="btn"
-                  onClick={() => assignTemplateToAthlete(a.uid)}
-                  disabled={alreadyAssigned}
-                  title={alreadyAssigned ? "Settimana già assegnata" : "Assegna settimana"}
+                  onClick={() => assignTemplateToAthlete(a)}
+                  disabled={alreadyAssigned || expired}
+                  title={
+                    expired
+                      ? "Abbonamento scaduto"
+                      : alreadyAssigned
+                      ? "Settimana già assegnata"
+                      : "Assegna settimana"
+                  }
                 >
-                  {alreadyAssigned ? "Già assegnata" : "Assegna settimana"}
+                  {expired ? "Abbonamento scaduto" : alreadyAssigned ? "Già assegnata" : "Assegna settimana"}
                 </button>
 
                 <button
