@@ -45,6 +45,8 @@ function CoachAthletesInner() {
   const [athletes, setAthletes] = useState<Athlete[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+  const [confirmMessage, setConfirmMessage] = useState("");
+  const [confirmType, setConfirmType] = useState<"success" | "error" | "warning">("success");
 
   useEffect(() => {
     const qUsers = query(collection(db, "users"), where("role", "==", "athlete"));
