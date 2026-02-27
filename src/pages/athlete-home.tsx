@@ -3,7 +3,7 @@ import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import Link from "next/link";
 import { RoleGuard } from "../components/RoleGuard";
 import { TopBar } from "../components/TopBar";
-import { useSession } from "../lib/session";
+import { useSession, isSubscriptionExpired } from "../lib/session";
 import { db } from "../lib/firebase";
 
 type Week = {
@@ -44,7 +44,7 @@ function AthleteHomeInner() {
     ? profile.subscriptionExpiresAt
     : null;
 
-  const isExpired = !!(subscriptionExpiry && subscriptionExpiry < new Date());
+  const isExpired = isSubscriptionExpired(profile?.subscriptionExpiresAt);
   const daysUntilExpiry = subscriptionExpiry
     ? Math.ceil((subscriptionExpiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     : null;

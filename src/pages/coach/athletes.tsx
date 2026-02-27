@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { RoleGuard } from "../../components/RoleGuard";
 import { TopBar } from "../../components/TopBar";
 import { db } from "../../lib/firebase";
+import { useSession, isSubscriptionExpired } from "../../lib/session";
 import {
   collection,
   doc,
@@ -34,15 +35,6 @@ function toDateInputValue(d: Date) {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
-}
-
-function isSubscriptionExpired(raw: any) {
-  const expiry = raw?.toDate?.() instanceof Date
-    ? raw.toDate()
-    : raw instanceof Date
-    ? raw
-    : null;
-  return !!(expiry && expiry < new Date());
 }
 
 export default function CoachAthletes() {

@@ -6,7 +6,7 @@ import { Guard } from '../../components/Guard';
 import { TopBar } from '../../components/TopBar';
 import { db } from '../../lib/firebase';
 import { paths } from '../../lib/paths';
-import { useSession } from '../../lib/session';
+import { useSession, isSubscriptionExpired } from '../../lib/session';
 
 export default function Week() {
   const router = useRouter();
@@ -20,7 +20,7 @@ export default function Week() {
     : profile?.subscriptionExpiresAt instanceof Date
     ? profile.subscriptionExpiresAt
     : null;
-  const isExpired = !!(subscriptionExpiry && subscriptionExpiry < new Date());
+  const isExpired = isSubscriptionExpired(profile?.subscriptionExpiresAt);
 
   return (
     <Guard>

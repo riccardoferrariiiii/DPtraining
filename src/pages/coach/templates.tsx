@@ -3,6 +3,7 @@ import Link from "next/link";
 import { RoleGuard } from "../../components/RoleGuard";
 import { TopBar } from "../../components/TopBar";
 import { db } from "../../lib/firebase";
+import { isSubscriptionExpired } from "../../lib/session";
 import {
   addDoc,
   collection,
@@ -36,15 +37,6 @@ type AssignedWeek = {
   title: string;
   templateId: string;
 };
-
-function isSubscriptionExpired(raw: any) {
-  const expiry = raw?.toDate?.() instanceof Date
-    ? raw.toDate()
-    : raw instanceof Date
-    ? raw
-    : null;
-  return !!(expiry && expiry < new Date());
-}
 
 export default function CoachTemplates() {
   return (

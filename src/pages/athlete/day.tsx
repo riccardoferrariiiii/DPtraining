@@ -5,7 +5,7 @@ import { Guard } from '../../components/Guard';
 import { TopBar } from '../../components/TopBar';
 import { db } from '../../lib/firebase';
 import { paths } from '../../lib/paths';
-import { useSession } from '../../lib/session';
+import { useSession, isSubscriptionExpired } from '../../lib/session';
 
 function WorkoutResultForm({ athleteUid, weekId, weekTitle, dayId, dayLabel, workout }: any) {
   const [weightKg, setWeight] = useState('');
@@ -180,7 +180,7 @@ export default function Day() {
     : profile?.subscriptionExpiresAt instanceof Date
     ? profile.subscriptionExpiresAt
     : null;
-  const isExpired = !!(subscriptionExpiry && subscriptionExpiry < new Date());
+  const isExpired = isSubscriptionExpired(profile?.subscriptionExpiresAt);
 
   return (
     <Guard>

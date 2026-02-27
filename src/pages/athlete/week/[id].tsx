@@ -6,7 +6,7 @@ import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 import { RoleGuard } from "../../../components/RoleGuard";
 import { TopBar } from "../../../components/TopBar";
-import { useSession } from "../../../lib/session";
+import { useSession, isSubscriptionExpired } from "../../../lib/session";
 import { db } from "../../../lib/firebase";
 import {
   doc,
@@ -51,7 +51,7 @@ function AthleteWeekInner() {
     : profile?.subscriptionExpiresAt instanceof Date
     ? profile.subscriptionExpiresAt
     : null;
-  const isExpired = !!(subscriptionExpiry && subscriptionExpiry < new Date());
+  const isExpired = isSubscriptionExpired(profile?.subscriptionExpiresAt);
 
   // week -> templateId
   useEffect(() => {

@@ -24,6 +24,44 @@ export type Session = {
 
 const SessionContext = createContext<Session | null>(null);
 
+/**
+ * Utilità globale per controllare se un abbonamento è scaduto.
+ * Supporta: Timestamp Firestore, Date, numero (ms), string ISO
+ */
+export function isSubscriptionExpired(raw: any): boolean {
+  if (!raw) return false;
+
+  let expiry: Date | null = null;
+
+  // Firestore Timestamp
+  if (raw?.toDate && typeof raw.toDate === "function") {
+    try {
+      expiry = raw.toDate();
+    } catch {
+      return false;
+    }
+  }
+  // Date object
+  else if (raw instanceof Date) {
+    expiry = raw;
+  }
+  // Numero (ms)
+  else if (typeof raw === "number") {
+    expiry = new Date(raw);
+  }
+  // String ISO
+  else if (typeof raw === "string") {
+    expiry = new Date(raw);
+  }
+
+  if (!expiry || isNaN(expiry.getTime())) return false;
+
+  const now = new Date();
+  const isExpired = expiry < now;
+  
+  return isExpired;
+}
+
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -75,4 +113,4 @@ export function useSession(): Session {
     return { user: null, profile: null, loading: true };
   }
   return v;
-}
+} 
