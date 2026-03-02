@@ -67,9 +67,8 @@ export default function Login() {
   return (
     <div className="container">
       <div className="card" style={{ marginTop: 40, maxWidth: 420, margin: "40px auto 0" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginBottom: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 24 }}>
           <img src="/logo.svg?v=4" alt="TRAINED" style={{ width: 40, height: 40 }} />
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800 }}>TRAINED</h1>
         </div>
 
         {!isRegister ? (
