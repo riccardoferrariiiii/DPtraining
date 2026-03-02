@@ -5,6 +5,7 @@ import { TopBar } from "../../components/TopBar";
 import { db } from "../../lib/firebase";
 import { useSession, isSubscriptionExpired } from "../../lib/session";
 import {
+  deleteDoc,
   collection,
   doc,
   getDocs,
@@ -48,9 +49,11 @@ export default function CoachAthletes() {
 function CoachAthletesInner() {
   const router = useRouter();
   const [athletes, setAthletes] = useState<Athlete[]>([]);
+  const [searchAthlete, setSearchAthlete] = useState("");
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
   const [alreadyAssignedMap, setAlreadyAssignedMap] = useState<Record<string, boolean>>({});
+  const [deletingUid, setDeletingUid] = useState<string>("");
   const [confirmMessage, setConfirmMessage] = useState("");
   const [confirmType, setConfirmType] = useState<"success" | "error" | "warning">("success");
 
@@ -84,6 +87,17 @@ function CoachAthletesInner() {
   const templateTitle = useMemo(() => {
     return templates.find((t) => t.id === selectedTemplate)?.title || "";
   }, [templates, selectedTemplate]);
+
+  const filteredAthletes = useMemo(() => {
+    const queryText = searchAthlete.trim().toLowerCase();
+    if (!queryText) return athletes;
+
+    return athletes.filter((athlete) => {
+      const fullName = `${athlete.firstName || ""} ${athlete.lastName || ""}`.trim().toLowerCase();
+      const email = (athlete.email || "").toLowerCase();
+      return fullName.includes(queryText) || email.includes(queryText);
+    });
+  }, [athletes, searchAthlete]);
 
   useEffect(() => {
     const loadAlreadyAssigned = async () => {
@@ -165,11 +179,50 @@ function CoachAthletesInner() {
     setAlreadyAssignedMap((p) => ({ ...p, [uid]: true }));
   };
 
+  const deleteAthlete = async (athlete: Athlete) => {
+    const athleteLabel =
+      athlete.firstName && athlete.lastName
+        ? `${athlete.firstName} ${athlete.lastName}`
+        : athlete.email || "questo atleta";
+
+    const shouldDelete = window.confirm(`Vuoi eliminare ${athleteLabel}?`);
+    if (!shouldDelete) return;
+
+    try {
+      setDeletingUid(athlete.uid);
+
+      const weeksRef = collection(db, "users", athlete.uid, "weeks");
+      const weeksSnap = await getDocs(weeksRef);
+      await Promise.all(weeksSnap.docs.map((weekDoc) => deleteDoc(weekDoc.ref)));
+
+      await deleteDoc(doc(db, "users", athlete.uid));
+
+      setConfirmMessage("Atleta eliminato ✅");
+      setConfirmType("success");
+    } catch (error) {
+      setConfirmMessage("Errore durante l'eliminazione dell'atleta.");
+      setConfirmType("error");
+    } finally {
+      setDeletingUid("");
+    }
+  };
+
   return (
     <>
       <TopBar title="Gestisci Atleti" />
       <div className="container">
         <div className="card" style={{ marginTop: 20 }}>
+          <label style={{ display: "block", fontSize: 12, opacity: 0.75, marginBottom: 8 }}>
+            Cerca atleta
+          </label>
+          <input
+            className="input"
+            type="text"
+            placeholder="Cerca per nome o email"
+            value={searchAthlete}
+            onChange={(e) => setSearchAthlete(e.target.value)}
+          />
+
           <h2>Assegna settimana</h2>
           <p style={{ opacity: 0.8 }}>
             Seleziona una settimana e poi assegnala agli atleti che vuoi.
@@ -189,7 +242,7 @@ function CoachAthletesInner() {
           </select>
         </div>
 
-        {athletes.map((a) => {
+        {filteredAthletes.map((a) => {
           const alreadyAssigned = !!alreadyAssignedMap[a.uid];
           const expired = isSubscriptionExpired(a.subscriptionExpiresAt);
           const expiry =
@@ -243,14 +296,22 @@ function CoachAthletesInner() {
                 >
                   Vedi risultati
                 </button>
+
+                <button
+                  className="btn"
+                  onClick={() => deleteAthlete(a)}
+                  disabled={deletingUid === a.uid}
+                >
+                  {deletingUid === a.uid ? "Eliminazione..." : "Elimina atleta"}
+                </button>
               </div>
             </div>
           );
         })}
 
-        {athletes.length === 0 && (
+        {filteredAthletes.length === 0 && (
           <div className="card" style={{ marginTop: 16 }}>
-            Nessun atleta trovato.
+            {athletes.length === 0 ? "Nessun atleta trovato." : "Nessun atleta corrisponde alla ricerca."}
           </div>
         )}
       </div>

@@ -21,7 +21,7 @@ self.__BUILD_MANIFEST = {
     "static/chunks/585b8f951ba92b48.js"
   ],
   "/coach/athletes": [
-    "static/chunks/961cd0b49aaa1ba2.js"
+    "static/chunks/878cebdec6ca8068.js"
   ],
   "/coach/program": [
     "static/chunks/63ef897d9065b340.js"
