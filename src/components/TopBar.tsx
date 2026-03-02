@@ -5,6 +5,7 @@ import { auth, db } from "../lib/firebase";
 import { useEffect, useMemo, useState } from "react";
 import {
   collection,
+  deleteDoc,
   doc,
   limit,
   onSnapshot,
@@ -96,6 +97,22 @@ export function TopBar({ title }: { title: string }) {
     goHome();
   };
 
+  const deleteNotificationItem = async (id: string) => {
+    if (!user?.uid) return;
+    await deleteDoc(doc(db, "users", user.uid, "notifications", id));
+  };
+
+  const clearNotifications = async () => {
+    if (!user?.uid) return;
+    if (notifications.length === 0) return;
+
+    const batch = writeBatch(db);
+    notifications.forEach((n) => {
+      batch.delete(doc(db, "users", user.uid, "notifications", n.id));
+    });
+    await batch.commit();
+  };
+
   return (
     <>
       <div className="topbar">
@@ -177,27 +194,34 @@ export function TopBar({ title }: { title: string }) {
             ) : (
               <div className="stack" style={{ gap: 10 }}>
                 {notifications.map((n) => (
-                  <button
+                  <div
                     key={n.id}
-                    className="btn"
                     style={{
-                      textAlign: "left",
-                      justifyContent: "flex-start",
-                      width: "100%",
-                      flexDirection: "column",
-                      alignItems: "flex-start",
-                      gap: 4,
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      borderRadius: 12,
+                      padding: 10,
+                      background: "rgba(255,255,255,0.04)",
                     }}
-                    onClick={() => openNotificationItem(n)}
                   >
-                    <div style={{ fontWeight: 700 }}>{n.title || "Notifica"}</div>
-                    <div className="small" style={{ opacity: 0.9 }}>{n.message || ""}</div>
-                  </button>
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>{n.title || "Notifica"}</div>
+                    <div className="small" style={{ opacity: 0.9, marginBottom: 10 }}>{n.message || ""}</div>
+                    <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                      <button className="btn" onClick={() => openNotificationItem(n)}>
+                        Apri
+                      </button>
+                      <button className="btn btnDanger" onClick={() => deleteNotificationItem(n.id)}>
+                        Elimina
+                      </button>
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
 
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 12 }}>
+              <button className="btn btnDanger" onClick={clearNotifications} disabled={notifications.length === 0}>
+                Elimina tutte
+              </button>
               <button className="btn btnPrimary" onClick={() => setNotificationsOpen(false)}>
                 Chiudi
               </button>

@@ -157,9 +157,14 @@ function ProgressInner() {
     if (!text) return;
 
     const focusDayId = result.dayId || result.id;
-    const commentLink = result.weekId
-      ? `/athlete/week/${result.weekId}#day-${focusDayId}`
-      : "/athlete-home";
+    const commentLink =
+      result.source === "entries"
+        ? result.weekId && result.dayId
+          ? `/athlete/day?weekId=${result.weekId}&dayId=${result.dayId}`
+          : "/athlete-home"
+        : result.weekId
+        ? `/athlete/week/${result.weekId}#day-${focusDayId}`
+        : "/athlete-home";
 
     if (result.source === "entries") {
       await updateDoc(doc(db, "results", athleteUid, "entries", result.id), {
@@ -241,8 +246,18 @@ function ProgressInner() {
                 />
 
                 {r.result && (
-                  <div className="small" style={{ marginTop: 8 }}>
-                    Risultato atleta: {r.result}
+                  <div
+                    style={{
+                      marginTop: 10,
+                      marginBottom: 4,
+                      padding: 10,
+                      borderRadius: 10,
+                      background: "rgba(100,149,237,0.15)",
+                      border: "1px solid rgba(100,149,237,0.35)",
+                    }}
+                  >
+                    <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>Commento atleta</div>
+                    <div style={{ whiteSpace: "pre-wrap" }}>{r.result}</div>
                   </div>
                 )}
 
