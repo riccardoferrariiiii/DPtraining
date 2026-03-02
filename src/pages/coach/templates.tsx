@@ -116,15 +116,26 @@ function CoachTemplatesInner() {
   }, [templates, searchQuery]);
 
   const createTemplate = async () => {
-    if (!canCreate) return;
+    if (!canCreate) {
+      setConfirmMessage("Inserisci almeno 2 caratteri per il nome della settimana.");
+      setConfirmType("warning");
+      return;
+    }
 
-    await addDoc(collection(db, "programTemplates"), {
-      title: newTitle.trim(),
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
+    try {
+      await addDoc(collection(db, "programTemplates"), {
+        title: newTitle.trim(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
 
-    setNewTitle("");
+      setNewTitle("");
+      setConfirmMessage("Settimana creata ✅");
+      setConfirmType("success");
+    } catch (e: any) {
+      setConfirmMessage("Errore creazione settimana: " + (e?.message ?? e));
+      setConfirmType("error");
+    }
   };
 
   const renameTemplate = (t: Template) => {
