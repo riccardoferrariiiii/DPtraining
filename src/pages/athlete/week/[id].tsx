@@ -6,6 +6,7 @@ import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 import { RoleGuard } from "../../../components/RoleGuard";
 import { TopBar } from "../../../components/TopBar";
+import { notifyAllCoaches } from "../../../lib/inAppNotifications";
 import { useSession, isSubscriptionExpired } from "../../../lib/session";
 import { db } from "../../../lib/firebase";
 import {
@@ -148,6 +149,19 @@ function AthleteWeekInner() {
     return () => unsub();
   }, [user, weekId]);
 
+  useEffect(() => {
+    if (!days.length) return;
+    if (typeof window === "undefined") return;
+
+    const hash = window.location.hash;
+    if (!hash.startsWith("#day-")) return;
+
+    const target = document.getElementById(hash.slice(1));
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [days]);
+
   const pageTitle = useMemo(() => title, [title]);
 
   const saveResult = async (day: TemplateDay) => {
@@ -157,15 +171,30 @@ function AthleteWeekInner() {
     }
     if (!user || !weekId) return;
     try {
+      const resultText = (draft[day.id] ?? results[day.id] ?? "").trim();
       await setDoc(
         doc(db, "users", user.uid, "weeks", weekId, "results", day.id),
         {
-          result: (draft[day.id] ?? results[day.id] ?? "").trim(),
+          result: resultText,
           dayOrder: day.order,
           updatedAt: serverTimestamp(),
         },
         { merge: true }
       );
+
+      if (resultText) {
+        const athleteLabel =
+          (profile as any)?.firstName && (profile as any)?.lastName
+            ? `${(profile as any).firstName} ${(profile as any).lastName}`
+            : profile?.email || "Un atleta";
+
+        await notifyAllCoaches({
+          type: "result_submitted",
+          title: "Nuovo risultato atleta",
+          message: `${athleteLabel} ha inviato un risultato (${title} • Giorno ${day.order}).`,
+          link: `/coach/progress?athleteUid=${user.uid}`,
+        });
+      }
     } catch (e: any) {
       setErr(`Save result error: ${String(e?.message || e)}`);
     }
@@ -201,7 +230,7 @@ function AthleteWeekInner() {
             )}
 
             {days.map((day) => (
-              <div key={day.id} className="card" style={{ marginTop: 18 }}>
+              <div id={`day-${day.id}`} key={day.id} className="card" style={{ marginTop: 18 }}>
                 <h3 style={{ marginBottom: 10 }}>Giorno {day.order}</h3>
 
                 <div style={{ whiteSpace: "pre-wrap" }}>{day.workout || "—"}</div>

@@ -156,6 +156,11 @@ function ProgressInner() {
     const text = (commentDrafts[result.key] || "").trim();
     if (!text) return;
 
+    const focusDayId = result.dayId || result.id;
+    const commentLink = result.weekId
+      ? `/athlete/week/${result.weekId}#day-${focusDayId}`
+      : "/athlete-home";
+
     if (result.source === "entries") {
       await updateDoc(doc(db, "results", athleteUid, "entries", result.id), {
         coachComment: text,
@@ -167,7 +172,7 @@ function ProgressInner() {
         type: "coach_comment",
         title: "Nuovo commento del coach",
         message: "Hai ricevuto una risposta al tuo risultato.",
-        link: "/athlete-home",
+        link: commentLink,
       });
       return;
     }
@@ -183,7 +188,7 @@ function ProgressInner() {
         type: "coach_comment",
         title: "Nuovo commento del coach",
         message: "Hai ricevuto una risposta al tuo risultato.",
-        link: "/athlete-home",
+        link: commentLink,
       });
     }
   };

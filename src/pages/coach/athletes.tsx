@@ -169,7 +169,7 @@ function CoachAthletesInner() {
     }
 
     // crea una nuova week assegnata all'atleta
-    await addDoc(collection(db, "users", uid, "weeks"), {
+    const weekRef = await addDoc(collection(db, "users", uid, "weeks"), {
       templateId: selectedTemplate,
       title: templateTitle || "Settimana",
       createdAt: serverTimestamp(),
@@ -180,7 +180,7 @@ function CoachAthletesInner() {
       type: "week_assigned",
       title: "Nuova settimana assegnata",
       message: `Il coach ti ha assegnato ${templateTitle || "una settimana"}.`,
-      link: "/athlete-home",
+      link: `/athlete/week/${weekRef.id}`,
     });
 
     setConfirmMessage("Template assegnato ✅");

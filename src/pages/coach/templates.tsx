@@ -3,6 +3,7 @@ import Link from "next/link";
 import { RoleGuard } from "../../components/RoleGuard";
 import { TopBar } from "../../components/TopBar";
 import { db } from "../../lib/firebase";
+import { createInAppNotification } from "../../lib/inAppNotifications";
 import { isSubscriptionExpired } from "../../lib/session";
 import {
   addDoc,
@@ -278,14 +279,21 @@ function CoachTemplatesInner() {
     setAssigningAthletes(true);
     try {
       await Promise.all(
-        assignableAthletes.map((uid) =>
-          addDoc(collection(db, "users", uid, "weeks"), {
+        assignableAthletes.map(async (uid) => {
+          const weekRef = await addDoc(collection(db, "users", uid, "weeks"), {
             templateId: selectedTemplateId,
             title: template.title,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
-          })
-        )
+          });
+
+          await createInAppNotification(uid, {
+            type: "week_assigned",
+            title: "Nuova settimana assegnata",
+            message: `Il coach ti ha assegnato ${template.title}.`,
+            link: `/athlete/week/${weekRef.id}`,
+          });
+        })
       );
 
       setConfirmMessage(
