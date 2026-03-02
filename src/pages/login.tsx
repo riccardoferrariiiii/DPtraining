@@ -127,6 +127,14 @@ export default function Login() {
             >
               Crea Account
             </button>
+
+            <button
+              className="btn"
+              style={{ marginTop: 10 }}
+              onClick={() => router.push(email.trim() ? `/reset-password?email=${encodeURIComponent(email.trim())}` : "/reset-password")}
+            >
+              Password dimenticata?
+            </button>
           </>
         ) : (
           <>
