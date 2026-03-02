@@ -2,6 +2,7 @@ import { useRouter } from "next/router";
 import { RoleGuard } from "../../components/RoleGuard";
 import { TopBar } from "../../components/TopBar";
 import { db } from "../../lib/firebase";
+import { createInAppNotification } from "../../lib/inAppNotifications";
 import { useEffect, useState } from "react";
 import {
   collection,
@@ -153,12 +154,20 @@ function ProgressInner() {
 
   const saveComment = async (result: ResultEntry) => {
     const text = (commentDrafts[result.key] || "").trim();
+    if (!text) return;
 
     if (result.source === "entries") {
       await updateDoc(doc(db, "results", athleteUid, "entries", result.id), {
         coachComment: text,
         coachCommentAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
+      });
+
+      await createInAppNotification(athleteUid, {
+        type: "coach_comment",
+        title: "Nuovo commento del coach",
+        message: "Hai ricevuto una risposta al tuo risultato.",
+        link: "/athlete-home",
       });
       return;
     }
@@ -168,6 +177,13 @@ function ProgressInner() {
         coachComment: text,
         coachCommentAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
+      });
+
+      await createInAppNotification(athleteUid, {
+        type: "coach_comment",
+        title: "Nuovo commento del coach",
+        message: "Hai ricevuto una risposta al tuo risultato.",
+        link: "/athlete-home",
       });
     }
   };

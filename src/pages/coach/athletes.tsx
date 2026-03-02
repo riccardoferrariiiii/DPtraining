@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { RoleGuard } from "../../components/RoleGuard";
 import { TopBar } from "../../components/TopBar";
 import { db } from "../../lib/firebase";
+import { createInAppNotification } from "../../lib/inAppNotifications";
 import { useSession, isSubscriptionExpired } from "../../lib/session";
 import {
   deleteDoc,
@@ -173,6 +174,13 @@ function CoachAthletesInner() {
       title: templateTitle || "Settimana",
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
+    });
+
+    await createInAppNotification(uid, {
+      type: "week_assigned",
+      title: "Nuova settimana assegnata",
+      message: `Il coach ti ha assegnato ${templateTitle || "una settimana"}.`,
+      link: "/athlete-home",
     });
 
     setConfirmMessage("Template assegnato ✅");

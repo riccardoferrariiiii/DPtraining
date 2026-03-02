@@ -3,6 +3,7 @@ import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import Link from "next/link";
 import { RoleGuard } from "../components/RoleGuard";
 import { TopBar } from "../components/TopBar";
+import { createUniqueInAppNotification } from "../lib/inAppNotifications";
 import { useSession, isSubscriptionExpired } from "../lib/session";
 import { db } from "../lib/firebase";
 
@@ -48,6 +49,23 @@ function AthleteHomeInner() {
   const daysUntilExpiry = subscriptionExpiry
     ? Math.ceil((subscriptionExpiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     : null;
+
+  useEffect(() => {
+    if (!user?.uid || !subscriptionExpiry || isExpired) return;
+    if (daysUntilExpiry !== 2) return;
+
+    const yyyy = subscriptionExpiry.getFullYear();
+    const mm = String(subscriptionExpiry.getMonth() + 1).padStart(2, "0");
+    const dd = String(subscriptionExpiry.getDate()).padStart(2, "0");
+    const key = `${yyyy}-${mm}-${dd}`;
+
+    createUniqueInAppNotification(user.uid, `subscription-expiring-${key}`, {
+      type: "subscription_expiring",
+      title: "Abbonamento in scadenza",
+      message: "Il tuo abbonamento scade tra 2 giorni.",
+      link: "/athlete-home",
+    }).catch(() => {});
+  }, [daysUntilExpiry, isExpired, subscriptionExpiry, user?.uid]);
 
   return (
     <>

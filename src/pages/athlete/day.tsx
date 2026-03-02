@@ -4,10 +4,11 @@ import { useEffect, useState } from 'react';
 import { Guard } from '../../components/Guard';
 import { TopBar } from '../../components/TopBar';
 import { db } from '../../lib/firebase';
+import { notifyAllCoaches } from '../../lib/inAppNotifications';
 import { paths } from '../../lib/paths';
 import { useSession, isSubscriptionExpired } from '../../lib/session';
 
-function WorkoutResultForm({ athleteUid, weekId, weekTitle, dayId, dayLabel, workout }: any) {
+function WorkoutResultForm({ athleteUid, athleteLabel, weekId, weekTitle, dayId, dayLabel, workout }: any) {
   const [weightKg, setWeight] = useState('');
   const [reps, setReps] = useState('');
   const [timeSeconds, setTime] = useState('');
@@ -50,6 +51,13 @@ function WorkoutResultForm({ athleteUid, weekId, weekTitle, dayId, dayLabel, wor
         value,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
+      });
+
+      await notifyAllCoaches({
+        type: "result_submitted",
+        title: "Nuovo risultato atleta",
+        message: `${athleteLabel || "Un atleta"} ha inviato un risultato${workout?.title ? ` (${workout.title})` : ""}.`,
+        link: `/coach/progress?athleteUid=${athleteUid}`,
       });
 
       setWeight(''); setReps(''); setTime(''); setNotes('');
@@ -181,6 +189,10 @@ export default function Day() {
     ? profile.subscriptionExpiresAt
     : null;
   const isExpired = isSubscriptionExpired(profile?.subscriptionExpiresAt);
+  const athleteLabel =
+    (profile as any)?.firstName && (profile as any)?.lastName
+      ? `${(profile as any).firstName} ${(profile as any).lastName}`
+      : profile?.email || "Atleta";
 
   return (
     <Guard>
@@ -221,7 +233,7 @@ export default function Day() {
               ) : (
                 <div className="stack">
                   {workouts.map(w => (
-                    <WorkoutResultForm key={w.id} athleteUid={user.uid} weekId={weekId} weekTitle={week?.title} dayId={dayId} dayLabel={day?.label || ''} workout={w} />
+                    <WorkoutResultForm key={w.id} athleteUid={user.uid} athleteLabel={athleteLabel} weekId={weekId} weekTitle={week?.title} dayId={dayId} dayLabel={day?.label || ''} workout={w} />
                   ))}
                 </div>
               )}
