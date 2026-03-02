@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, onSnapshot } from "firebase/firestore";
 import Link from "next/link";
 import { RoleGuard } from "../components/RoleGuard";
 import { TopBar } from "../components/TopBar";
@@ -10,6 +10,7 @@ import { db } from "../lib/firebase";
 type Week = {
   id: string;
   title: string;
+  source: "users" | "legacy";
   createdAt?: any;
 };
 
@@ -21,22 +22,43 @@ function AthleteHomeInner() {
   useEffect(() => {
     if (!user) return;
 
-    const q = query(
-      collection(db, "users", user.uid, "weeks"),
-      orderBy("createdAt", "desc")
-    );
+    let usersWeeks: Week[] = [];
+    let legacyWeeks: Week[] = [];
 
-    const unsub = onSnapshot(q, (snap) => {
-      const list = snap.docs.map((d) => ({
+    const syncWeeks = () => {
+      const merged = [...usersWeeks, ...legacyWeeks].sort((a, b) => {
+        const at = a.createdAt?.toDate?.()?.getTime?.() || 0;
+        const bt = b.createdAt?.toDate?.()?.getTime?.() || 0;
+        return bt - at;
+      });
+      setWeeks(merged);
+      setLoading(false);
+    };
+
+    const unsubUsers = onSnapshot(collection(db, "users", user.uid, "weeks"), (snap) => {
+      usersWeeks = snap.docs.map((d) => ({
         id: d.id,
         title: (d.data() as any).title || "Settimana",
+        source: "users" as const,
         createdAt: (d.data() as any).createdAt,
       }));
-      setWeeks(list);
-      setLoading(false);
+      syncWeeks();
     });
 
-    return () => unsub();
+    const unsubLegacy = onSnapshot(collection(db, "athletePrograms", user.uid, "weeks"), (snap) => {
+      legacyWeeks = snap.docs.map((d) => ({
+        id: d.id,
+        title: (d.data() as any).title || "Settimana",
+        source: "legacy" as const,
+        createdAt: (d.data() as any).createdAt,
+      }));
+      syncWeeks();
+    });
+
+    return () => {
+      unsubUsers();
+      unsubLegacy();
+    };
   }, [user]);
 
   const subscriptionExpiry = profile?.subscriptionExpiresAt?.toDate?.()
@@ -124,8 +146,8 @@ function AthleteHomeInner() {
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 16 }}>
               {weeks.map((week) => (
                 <Link
-                  key={`${week.id}-${week.title}`}
-                  href={`/athlete/week/${week.id}`}
+                  key={`${week.source}-${week.id}-${week.title}`}
+                  href={week.source === "users" ? `/athlete/week/${week.id}` : `/athlete/week?weekId=${week.id}`}
                   className="card"
                   style={{
                     cursor: "pointer",
