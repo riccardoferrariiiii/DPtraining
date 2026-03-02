@@ -188,12 +188,12 @@ function AthleteWeekInner() {
             ? `${(profile as any).firstName} ${(profile as any).lastName}`
             : profile?.email || "Un atleta";
 
-        await notifyAllCoaches({
+        notifyAllCoaches({
           type: "result_submitted",
           title: "Nuovo risultato atleta",
           message: `${athleteLabel} ha inviato un risultato (${title} • Giorno ${day.order}).`,
           link: `/coach/progress?athleteUid=${user.uid}`,
-        });
+        }).catch(() => {});
       }
     } catch (e: any) {
       setErr(`Save result error: ${String(e?.message || e)}`);

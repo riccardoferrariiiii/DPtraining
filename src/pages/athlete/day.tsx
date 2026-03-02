@@ -53,12 +53,12 @@ function WorkoutResultForm({ athleteUid, athleteLabel, weekId, weekTitle, dayId,
         updatedAt: serverTimestamp(),
       });
 
-      await notifyAllCoaches({
+      notifyAllCoaches({
         type: "result_submitted",
         title: "Nuovo risultato atleta",
         message: `${athleteLabel || "Un atleta"} ha inviato un risultato${workout?.title ? ` (${workout.title})` : ""}.`,
         link: `/coach/progress?athleteUid=${athleteUid}`,
-      });
+      }).catch(() => {});
 
       setWeight(''); setReps(''); setTime(''); setNotes('');
       setConfirmMessage('Salvato ✅');
