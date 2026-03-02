@@ -117,14 +117,14 @@ export function TopBar({ title }: { title: string }) {
     <>
       <div className="topbar">
         <div className="topbarInner">
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div className="topbarBrand" style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <img src="/logo.svg?v=4" alt="TRAINED" style={{ width: 32, height: 32 }} />
             <h2 style={{ cursor: "pointer", margin: 0, fontSize: 16, fontWeight: 700 }} onClick={goHome}>
               {title}
             </h2>
           </div>
 
-          <div style={{ display: "flex", gap: 10 }}>
+          <div className="topbarActions" style={{ display: "flex", gap: 10 }}>
             <button onClick={openNotifications} className="btn" style={{ position: "relative" }}>
               Notifiche
               {unreadCount > 0 && (
@@ -148,7 +148,7 @@ export function TopBar({ title }: { title: string }) {
                 </span>
               )}
             </button>
-            <button onClick={goHome} className="btn" style={{ marginRight: 10 }}>
+            <button onClick={goHome} className="btn">
               Home
             </button>
             <button onClick={logout} className="btn">
