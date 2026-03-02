@@ -54,6 +54,7 @@ function CoachAthletesInner() {
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
   const [alreadyAssignedMap, setAlreadyAssignedMap] = useState<Record<string, boolean>>({});
   const [deletingUid, setDeletingUid] = useState<string>("");
+  const [athleteToDelete, setAthleteToDelete] = useState<Athlete | null>(null);
   const [confirmMessage, setConfirmMessage] = useState("");
   const [confirmType, setConfirmType] = useState<"success" | "error" | "warning">("success");
 
@@ -180,14 +181,6 @@ function CoachAthletesInner() {
   };
 
   const deleteAthlete = async (athlete: Athlete) => {
-    const athleteLabel =
-      athlete.firstName && athlete.lastName
-        ? `${athlete.firstName} ${athlete.lastName}`
-        : athlete.email || "questo atleta";
-
-    const shouldDelete = window.confirm(`Vuoi eliminare ${athleteLabel}?`);
-    if (!shouldDelete) return;
-
     try {
       setDeletingUid(athlete.uid);
 
@@ -204,7 +197,12 @@ function CoachAthletesInner() {
       setConfirmType("error");
     } finally {
       setDeletingUid("");
+      setAthleteToDelete(null);
     }
+  };
+
+  const requestDeleteAthlete = (athlete: Athlete) => {
+    setAthleteToDelete(athlete);
   };
 
   return (
@@ -298,8 +296,8 @@ function CoachAthletesInner() {
                 </button>
 
                 <button
-                  className="btn"
-                  onClick={() => deleteAthlete(a)}
+                  className="btn btnDanger"
+                  onClick={() => requestDeleteAthlete(a)}
                   disabled={deletingUid === a.uid}
                 >
                   {deletingUid === a.uid ? "Eliminazione..." : "Elimina atleta"}
@@ -315,6 +313,66 @@ function CoachAthletesInner() {
           </div>
         )}
       </div>
+
+      {athleteToDelete && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0, 0, 0, 1)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+          }}
+          onClick={() => {
+            if (!deletingUid) setAthleteToDelete(null);
+          }}
+        >
+          <div
+            style={{
+              background: "linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.08))",
+              border: "1px solid rgba(255,255,255,0.16)",
+              borderRadius: 18,
+              padding: 24,
+              width: "min(92vw, 460px)",
+              boxShadow: "0 24px 64px rgba(0,0,0,0.45)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 12 }}>
+              ⚠️ Conferma eliminazione
+            </div>
+            <div style={{ color: "rgba(245,245,247,0.75)", marginBottom: 20 }}>
+              Vuoi eliminare
+              {" "}
+              {athleteToDelete.firstName && athleteToDelete.lastName
+                ? `${athleteToDelete.firstName} ${athleteToDelete.lastName}`
+                : athleteToDelete.email || "questo atleta"}
+              ?
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button
+                className="btn"
+                onClick={() => setAthleteToDelete(null)}
+                disabled={!!deletingUid}
+              >
+                Annulla
+              </button>
+              <button
+                className="btn btnDanger"
+                onClick={() => deleteAthlete(athleteToDelete)}
+                disabled={!!deletingUid}
+              >
+                {deletingUid ? "Eliminazione..." : "Elimina atleta"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {confirmMessage && (
         <div
