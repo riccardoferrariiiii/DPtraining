@@ -83,6 +83,23 @@ function getDaysUntilExpiry(expiry: Date | null): number | null {
   return Math.ceil(diffMs / 86400000);
 }
 
+function normalizeDateInput(rawValue: string): string | null {
+  const value = rawValue.trim();
+  if (!value) return null;
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+
+  const italianFormat = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (italianFormat) {
+    const [, dd, mm, yyyy] = italianFormat;
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  return null;
+}
+
 function getStatusInfo(expired: boolean, daysUntilExpiry: number | null) {
   if (daysUntilExpiry === null) {
     return {
@@ -174,6 +191,7 @@ export default function CoachAthletes() {
 
 function CoachAthletesInner() {
   const router = useRouter();
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [athletes, setAthletes] = useState<Athlete[]>([]);
   const [searchAthlete, setSearchAthlete] = useState("");
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -185,6 +203,22 @@ function CoachAthletesInner() {
   const [athleteToDelete, setAthleteToDelete] = useState<Athlete | null>(null);
   const [confirmMessage, setConfirmMessage] = useState("");
   const [confirmType, setConfirmType] = useState<"success" | "error" | "warning">("success");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const mediaQuery = window.matchMedia("(max-width: 720px)");
+    const updateViewportFlag = () => setIsMobileViewport(mediaQuery.matches);
+    updateViewportFlag();
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", updateViewportFlag);
+      return () => mediaQuery.removeEventListener("change", updateViewportFlag);
+    }
+
+    mediaQuery.addListener(updateViewportFlag);
+    return () => mediaQuery.removeListener(updateViewportFlag);
+  }, []);
 
   useEffect(() => {
     const qUsers = query(collection(db, "users"), where("role", "==", "athlete"));
@@ -498,10 +532,23 @@ function CoachAthletesInner() {
                   <label style={{ fontSize: 12, opacity: 0.75 }}>Scadenza abbonamento</label>
                   <input
                     className="input athleteDateInput"
-                    type="date"
+                    type={isMobileViewport ? "text" : "date"}
+                    inputMode={isMobileViewport ? "numeric" : undefined}
+                    placeholder={isMobileViewport ? "YYYY-MM-DD o GG/MM/AAAA" : undefined}
                     defaultValue={expiryValue}
                     onBlur={(e) => {
-                      if (e.target.value) setExpiry(a.uid, e.target.value);
+                      if (!e.target.value) return;
+
+                      const normalizedDate = normalizeDateInput(e.target.value);
+                      if (!normalizedDate) {
+                        setConfirmMessage("Formato data non valido. Usa YYYY-MM-DD o GG/MM/AAAA.");
+                        setConfirmType("warning");
+                        e.target.value = expiryValue;
+                        return;
+                      }
+
+                      e.target.value = normalizedDate;
+                      setExpiry(a.uid, normalizedDate);
                     }}
                   />
                   <div style={{ fontSize: 12, opacity: 0.75 }}>
