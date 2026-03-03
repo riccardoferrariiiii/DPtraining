@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { RoleGuard } from "../../components/RoleGuard";
 import { TopBar } from "../../components/TopBar";
@@ -50,6 +50,13 @@ function toDateInputValue(d: Date) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function toItalianDateValue(d: Date) {
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
+
 function parseSubscriptionExpiry(raw: any): Date | null {
   if (!raw) return null;
 
@@ -81,23 +88,6 @@ function getDaysUntilExpiry(expiry: Date | null): number | null {
 
   const diffMs = expiryDate.getTime() - today.getTime();
   return Math.ceil(diffMs / 86400000);
-}
-
-function normalizeDateInput(rawValue: string): string | null {
-  const value = rawValue.trim();
-  if (!value) return null;
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return value;
-  }
-
-  const italianFormat = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (italianFormat) {
-    const [, dd, mm, yyyy] = italianFormat;
-    return `${yyyy}-${mm}-${dd}`;
-  }
-
-  return null;
 }
 
 function getStatusInfo(expired: boolean, daysUntilExpiry: number | null) {
@@ -191,7 +181,7 @@ export default function CoachAthletes() {
 
 function CoachAthletesInner() {
   const router = useRouter();
-  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const dateInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [athletes, setAthletes] = useState<Athlete[]>([]);
   const [searchAthlete, setSearchAthlete] = useState("");
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -203,22 +193,6 @@ function CoachAthletesInner() {
   const [athleteToDelete, setAthleteToDelete] = useState<Athlete | null>(null);
   const [confirmMessage, setConfirmMessage] = useState("");
   const [confirmType, setConfirmType] = useState<"success" | "error" | "warning">("success");
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const mediaQuery = window.matchMedia("(max-width: 720px)");
-    const updateViewportFlag = () => setIsMobileViewport(mediaQuery.matches);
-    updateViewportFlag();
-
-    if (typeof mediaQuery.addEventListener === "function") {
-      mediaQuery.addEventListener("change", updateViewportFlag);
-      return () => mediaQuery.removeEventListener("change", updateViewportFlag);
-    }
-
-    mediaQuery.addListener(updateViewportFlag);
-    return () => mediaQuery.removeListener(updateViewportFlag);
-  }, []);
 
   useEffect(() => {
     const qUsers = query(collection(db, "users"), where("role", "==", "athlete"));
@@ -530,27 +504,37 @@ function CoachAthletesInner() {
               <div className="athleteCardControls">
                 <div className="athleteExpiryBlock">
                   <label style={{ fontSize: 12, opacity: 0.75 }}>Scadenza abbonamento</label>
-                  <input
-                    className="input athleteDateInput"
-                    type={isMobileViewport ? "text" : "date"}
-                    inputMode={isMobileViewport ? "numeric" : undefined}
-                    placeholder={isMobileViewport ? "YYYY-MM-DD o GG/MM/AAAA" : undefined}
-                    defaultValue={expiryValue}
-                    onBlur={(e) => {
-                      if (!e.target.value) return;
+                  <div className="athleteDatePicker">
+                    <button
+                      type="button"
+                      className="input athleteDateDisplay"
+                      onClick={() => {
+                        const input = dateInputRefs.current[a.uid];
+                        if (!input) return;
 
-                      const normalizedDate = normalizeDateInput(e.target.value);
-                      if (!normalizedDate) {
-                        setConfirmMessage("Formato data non valido. Usa YYYY-MM-DD o GG/MM/AAAA.");
-                        setConfirmType("warning");
-                        e.target.value = expiryValue;
-                        return;
-                      }
-
-                      e.target.value = normalizedDate;
-                      setExpiry(a.uid, normalizedDate);
-                    }}
-                  />
+                        if (typeof input.showPicker === "function") {
+                          input.showPicker();
+                        } else {
+                          input.focus();
+                          input.click();
+                        }
+                      }}
+                    >
+                      {expiry ? toItalianDateValue(expiry) : "GG/MM/AAAA"}
+                    </button>
+                    <input
+                      ref={(el) => {
+                        dateInputRefs.current[a.uid] = el;
+                      }}
+                      className="athleteDateNative"
+                      type="date"
+                      value={expiryValue}
+                      onChange={(e) => {
+                        if (e.target.value) setExpiry(a.uid, e.target.value);
+                      }}
+                      aria-label="Seleziona data scadenza"
+                    />
+                  </div>
                   <div style={{ fontSize: 12, opacity: 0.75 }}>
                     {status.detail}
                   </div>
