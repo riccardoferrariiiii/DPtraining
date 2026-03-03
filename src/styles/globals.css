@@ -254,6 +254,13 @@ a{color:inherit;text-decoration:none}
   min-width:0;
 }
 
+.athleteDateInput{
+  display:block;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+}
+
 @media (min-width: 860px){
   .coachAthletesToolbar{
     grid-template-columns: 1fr 280px;
@@ -285,6 +292,16 @@ a{color:inherit;text-decoration:none}
   .athleteExpiryBlock{
     flex-basis:100%;
     min-width:100%;
+  }
+
+  .athleteDateInput{
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
+    display:block;
+    font-size:14px;
+    padding-left:12px;
+    padding-right:12px;
   }
 
   .topbar{

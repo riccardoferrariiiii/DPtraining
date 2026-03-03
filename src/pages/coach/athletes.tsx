@@ -497,7 +497,7 @@ function CoachAthletesInner() {
                 <div className="athleteExpiryBlock">
                   <label style={{ fontSize: 12, opacity: 0.75 }}>Scadenza abbonamento</label>
                   <input
-                    className="input"
+                    className="input athleteDateInput"
                     type="date"
                     defaultValue={expiryValue}
                     onBlur={(e) => {
