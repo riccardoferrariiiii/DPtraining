@@ -182,6 +182,7 @@ export default function CoachAthletes() {
 function CoachAthletesInner() {
   const router = useRouter();
   const dateInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [athletes, setAthletes] = useState<Athlete[]>([]);
   const [searchAthlete, setSearchAthlete] = useState("");
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -193,6 +194,22 @@ function CoachAthletesInner() {
   const [athleteToDelete, setAthleteToDelete] = useState<Athlete | null>(null);
   const [confirmMessage, setConfirmMessage] = useState("");
   const [confirmType, setConfirmType] = useState<"success" | "error" | "warning">("success");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const mediaQuery = window.matchMedia("(max-width: 720px)");
+    const updateViewportFlag = () => setIsMobileViewport(mediaQuery.matches);
+    updateViewportFlag();
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", updateViewportFlag);
+      return () => mediaQuery.removeEventListener("change", updateViewportFlag);
+    }
+
+    mediaQuery.addListener(updateViewportFlag);
+    return () => mediaQuery.removeListener(updateViewportFlag);
+  }, []);
 
   useEffect(() => {
     const qUsers = query(collection(db, "users"), where("role", "==", "athlete"));
@@ -504,37 +521,48 @@ function CoachAthletesInner() {
               <div className="athleteCardControls">
                 <div className="athleteExpiryBlock">
                   <label style={{ fontSize: 12, opacity: 0.75 }}>Scadenza abbonamento</label>
-                  <div className="athleteDatePicker">
-                    <button
-                      type="button"
-                      className="input athleteDateDisplay"
-                      onClick={() => {
-                        const input = dateInputRefs.current[a.uid];
-                        if (!input) return;
+                  {isMobileViewport ? (
+                    <div className="athleteDatePicker">
+                      <button
+                        type="button"
+                        className="input athleteDateDisplay"
+                        onClick={() => {
+                          const input = dateInputRefs.current[a.uid];
+                          if (!input) return;
 
-                        if (typeof input.showPicker === "function") {
-                          input.showPicker();
-                        } else {
-                          input.focus();
-                          input.click();
-                        }
-                      }}
-                    >
-                      {expiry ? toItalianDateValue(expiry) : "GG/MM/AAAA"}
-                    </button>
+                          if (typeof input.showPicker === "function") {
+                            input.showPicker();
+                          } else {
+                            input.focus();
+                            input.click();
+                          }
+                        }}
+                      >
+                        {expiry ? toItalianDateValue(expiry) : "GG/MM/AAAA"}
+                      </button>
+                      <input
+                        ref={(el) => {
+                          dateInputRefs.current[a.uid] = el;
+                        }}
+                        className="athleteDateNative"
+                        type="date"
+                        value={expiryValue}
+                        onChange={(e) => {
+                          if (e.target.value) setExpiry(a.uid, e.target.value);
+                        }}
+                        aria-label="Seleziona data scadenza"
+                      />
+                    </div>
+                  ) : (
                     <input
-                      ref={(el) => {
-                        dateInputRefs.current[a.uid] = el;
-                      }}
-                      className="athleteDateNative"
+                      className="input athleteDateInput"
                       type="date"
                       value={expiryValue}
                       onChange={(e) => {
                         if (e.target.value) setExpiry(a.uid, e.target.value);
                       }}
-                      aria-label="Seleziona data scadenza"
                     />
-                  </div>
+                  )}
                   <div style={{ fontSize: 12, opacity: 0.75 }}>
                     {status.detail}
                   </div>
