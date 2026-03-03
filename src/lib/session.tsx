@@ -26,7 +26,9 @@ const SessionContext = createContext<Session | null>(null);
 
 /**
  * Utilità globale per controllare se un abbonamento è scaduto.
- * Supporta: Timestamp Firestore, Date, numero (ms), string ISO
+ * Supporta: Timestamp Firestore, Date, numero (ms), string ISO.
+ * La data rappresenta l'istante di scadenza: scade allo scoccare
+ * della mezzanotte del giorno indicato.
  */
 export function isSubscriptionExpired(raw: any): boolean {
   if (!raw) return false;
@@ -57,7 +59,10 @@ export function isSubscriptionExpired(raw: any): boolean {
   if (!expiry || isNaN(expiry.getTime())) return false;
 
   const now = new Date();
-  const isExpired = expiry < now;
+  const expiryDayStart = new Date(expiry);
+  expiryDayStart.setHours(0, 0, 0, 0);
+
+  const isExpired = now >= expiryDayStart;
   
   return isExpired;
 }

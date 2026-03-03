@@ -177,7 +177,99 @@ a{color:inherit;text-decoration:none}
 .kpi .lbl{font-size:13px;color:var(--muted2);font-weight:600}
 .footerHint{margin-top: 16px;color: var(--muted2);font-size: 12px;}
 
+.coachAthletesToolbar{
+  display:grid;
+  grid-template-columns: 1fr;
+  gap:10px;
+}
+
+.quickFilterRow{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:10px;
+}
+
+.quickFilterBtn{
+  min-height:38px;
+  padding:8px 12px;
+  font-size:13px;
+  border-radius:999px;
+}
+
+.quickFilterBtnActive{
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(100,149,237,0.15);
+}
+
+.subscriptionBadge{
+  display:inline-flex;
+  align-items:center;
+  font-weight:700;
+}
+
+.subscriptionBadge_expired{
+  border-color: rgba(255,120,120,0.5);
+}
+
+.subscriptionBadge_soon{
+  border-color: rgba(255,255,255,0.28);
+}
+
+.subscriptionBadge_active{
+  border-color: var(--accent);
+}
+
+.subscriptionBadge_none{
+  opacity:0.8;
+}
+
+.athleteCardControls{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  align-items:flex-end;
+}
+
+.athleteExpiryBlock{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  flex:1 1 240px;
+  min-width:220px;
+}
+
+@media (min-width: 860px){
+  .coachAthletesToolbar{
+    grid-template-columns: 1fr 280px;
+  }
+}
+
 @media (max-width: 720px){
+  .quickFilterRow{
+    flex-wrap:nowrap;
+    overflow-x:auto;
+    padding-bottom:4px;
+    scrollbar-width: thin;
+  }
+
+  .quickFilterBtn{
+    white-space:nowrap;
+    flex:0 0 auto;
+  }
+
+  .athleteCardControls{
+    align-items:stretch;
+  }
+
+  .athleteCardControls .btn{
+    width:100%;
+  }
+
+  .athleteExpiryBlock{
+    min-width:100%;
+  }
+
   .topbar{
     background: rgba(5,5,7,0.86);
   }

@@ -4,7 +4,7 @@ import { RoleGuard } from "../../components/RoleGuard";
 import { TopBar } from "../../components/TopBar";
 import { db } from "../../lib/firebase";
 import { createInAppNotification } from "../../lib/inAppNotifications";
-import { useSession, isSubscriptionExpired } from "../../lib/session";
+import { isSubscriptionExpired } from "../../lib/session";
 import {
   deleteDoc,
   collection,
@@ -32,11 +32,136 @@ type Template = {
   title: string;
 };
 
+type QuickFilter = "all" | "expired" | "today" | "soon" | "active";
+type SortMode = "smart" | "expiryAsc" | "expiryDesc" | "nameAsc";
+
+type AthleteRow = {
+  athlete: Athlete;
+  fullName: string;
+  expiry: Date | null;
+  daysUntilExpiry: number | null;
+  expired: boolean;
+};
+
 function toDateInputValue(d: Date) {
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
+}
+
+function parseSubscriptionExpiry(raw: any): Date | null {
+  if (!raw) return null;
+
+  if (raw?.toDate && typeof raw.toDate === "function") {
+    const d = raw.toDate();
+    return d instanceof Date && !isNaN(d.getTime()) ? d : null;
+  }
+
+  if (raw instanceof Date) {
+    return !isNaN(raw.getTime()) ? raw : null;
+  }
+
+  if (typeof raw === "number" || typeof raw === "string") {
+    const d = new Date(raw);
+    return !isNaN(d.getTime()) ? d : null;
+  }
+
+  return null;
+}
+
+function getDaysUntilExpiry(expiry: Date | null): number | null {
+  if (!expiry) return null;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const expiryDate = new Date(expiry);
+  expiryDate.setHours(0, 0, 0, 0);
+
+  const diffMs = expiryDate.getTime() - today.getTime();
+  return Math.ceil(diffMs / 86400000);
+}
+
+function getStatusInfo(expired: boolean, daysUntilExpiry: number | null) {
+  if (daysUntilExpiry === null) {
+    return {
+      label: "Nessuna scadenza",
+      detail: "Scadenza non impostata",
+      kind: "none" as const,
+    };
+  }
+
+  if (expired) {
+    if (daysUntilExpiry === 0) {
+      return {
+        label: "Scaduto oggi",
+        detail: "Scaduto oggi",
+        kind: "expired" as const,
+      };
+    }
+
+    return {
+      label: "Scaduto",
+      detail: `Scaduto da ${Math.abs(daysUntilExpiry)} ${Math.abs(daysUntilExpiry) === 1 ? "giorno" : "giorni"}`,
+      kind: "expired" as const,
+    };
+  }
+
+  if (daysUntilExpiry === 1) {
+    return {
+      label: "Scade domani",
+      detail: "Scade domani",
+      kind: "soon" as const,
+    };
+  }
+
+  if (daysUntilExpiry <= 7) {
+    return {
+      label: "In scadenza",
+      detail: `${daysUntilExpiry} ${daysUntilExpiry === 1 ? "giorno" : "giorni"} alla scadenza`,
+      kind: "soon" as const,
+    };
+  }
+
+  return {
+    label: "Attivo",
+    detail: `${daysUntilExpiry} ${daysUntilExpiry === 1 ? "giorno" : "giorni"} alla scadenza`,
+    kind: "active" as const,
+  };
+}
+
+function matchesQuickFilter(row: AthleteRow, quickFilter: QuickFilter): boolean {
+  if (quickFilter === "all") return true;
+  if (quickFilter === "expired") return row.expired;
+  if (quickFilter === "today") return row.daysUntilExpiry === 0;
+  if (quickFilter === "soon") return !row.expired && row.daysUntilExpiry !== null && row.daysUntilExpiry <= 7;
+  if (quickFilter === "active") return !row.expired;
+  return true;
+}
+
+function compareSmart(a: AthleteRow, b: AthleteRow): number {
+  const getPriority = (row: AthleteRow) => {
+    if (row.expired) return 0;
+    if (row.daysUntilExpiry === null) return 4;
+    if (row.daysUntilExpiry <= 7) return 1;
+    return 2;
+  };
+
+  const pA = getPriority(a);
+  const pB = getPriority(b);
+  if (pA !== pB) return pA - pB;
+
+  const tA = rowToSortTime(a, true);
+  const tB = rowToSortTime(b, true);
+  if (tA !== tB) return tA - tB;
+
+  return a.fullName.localeCompare(b.fullName);
+}
+
+function rowToSortTime(row: AthleteRow, nullAsInfinity: boolean) {
+  if (!row.expiry) return nullAsInfinity ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
+  return row.expiry.getTime();
 }
 
 export default function CoachAthletes() {
@@ -53,6 +178,8 @@ function CoachAthletesInner() {
   const [searchAthlete, setSearchAthlete] = useState("");
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
+  const [sortMode, setSortMode] = useState<SortMode>("smart");
   const [alreadyAssignedMap, setAlreadyAssignedMap] = useState<Record<string, boolean>>({});
   const [deletingUid, setDeletingUid] = useState<string>("");
   const [athleteToDelete, setAthleteToDelete] = useState<Athlete | null>(null);
@@ -90,16 +217,67 @@ function CoachAthletesInner() {
     return templates.find((t) => t.id === selectedTemplate)?.title || "";
   }, [templates, selectedTemplate]);
 
+  const athleteRows = useMemo<AthleteRow[]>(() => {
+    return athletes.map((athlete) => {
+      const fullName = athlete.firstName && athlete.lastName
+        ? `${athlete.firstName} ${athlete.lastName}`
+        : athlete.email || "Atleta";
+
+      const expiry = parseSubscriptionExpiry(athlete.subscriptionExpiresAt);
+      const daysUntilExpiry = getDaysUntilExpiry(expiry);
+      const expired = isSubscriptionExpired(athlete.subscriptionExpiresAt);
+
+      return {
+        athlete,
+        fullName,
+        expiry,
+        daysUntilExpiry,
+        expired,
+      };
+    });
+  }, [athletes]);
+
   const filteredAthletes = useMemo(() => {
     const queryText = searchAthlete.trim().toLowerCase();
-    if (!queryText) return athletes;
+    const searched = !queryText
+      ? athleteRows
+      : athleteRows.filter((row) => {
+          const fullName = `${row.athlete.firstName || ""} ${row.athlete.lastName || ""}`.trim().toLowerCase();
+          const email = (row.athlete.email || "").toLowerCase();
+          return fullName.includes(queryText) || email.includes(queryText);
+        });
 
-    return athletes.filter((athlete) => {
-      const fullName = `${athlete.firstName || ""} ${athlete.lastName || ""}`.trim().toLowerCase();
-      const email = (athlete.email || "").toLowerCase();
-      return fullName.includes(queryText) || email.includes(queryText);
+    const filtered = searched.filter((row) => matchesQuickFilter(row, quickFilter));
+
+    const sorted = [...filtered].sort((a, b) => {
+      if (sortMode === "smart") return compareSmart(a, b);
+      if (sortMode === "nameAsc") return a.fullName.localeCompare(b.fullName);
+      if (sortMode === "expiryAsc") return rowToSortTime(a, true) - rowToSortTime(b, true);
+      if (sortMode === "expiryDesc") return rowToSortTime(b, false) - rowToSortTime(a, false);
+      return 0;
     });
-  }, [athletes, searchAthlete]);
+
+    return sorted;
+  }, [athleteRows, quickFilter, searchAthlete, sortMode]);
+
+  const quickFilterCounts = useMemo(() => {
+    const map: Record<QuickFilter, number> = {
+      all: athleteRows.length,
+      expired: 0,
+      today: 0,
+      soon: 0,
+      active: 0,
+    };
+
+    athleteRows.forEach((row) => {
+      if (matchesQuickFilter(row, "expired")) map.expired += 1;
+      if (matchesQuickFilter(row, "today")) map.today += 1;
+      if (matchesQuickFilter(row, "soon")) map.soon += 1;
+      if (matchesQuickFilter(row, "active")) map.active += 1;
+    });
+
+    return map;
+  }, [athleteRows]);
 
   useEffect(() => {
     const loadAlreadyAssigned = async () => {
@@ -221,13 +399,59 @@ function CoachAthletesInner() {
           <label style={{ display: "block", fontSize: 12, opacity: 0.75, marginBottom: 8 }}>
             Cerca atleta
           </label>
-          <input
-            className="input"
-            type="text"
-            placeholder="Cerca per nome o email"
-            value={searchAthlete}
-            onChange={(e) => setSearchAthlete(e.target.value)}
-          />
+          <div className="coachAthletesToolbar">
+            <input
+              className="input"
+              type="text"
+              placeholder="Cerca per nome o email"
+              value={searchAthlete}
+              onChange={(e) => setSearchAthlete(e.target.value)}
+            />
+
+            <select
+              className="input"
+              value={sortMode}
+              onChange={(e) => setSortMode(e.target.value as SortMode)}
+            >
+              <option value="smart">Ordina: intelligente</option>
+              <option value="expiryAsc">Scadenza: prima le vicine</option>
+              <option value="expiryDesc">Scadenza: prima le lontane</option>
+              <option value="nameAsc">Nome: A-Z</option>
+            </select>
+          </div>
+
+          <div className="quickFilterRow">
+            <button
+              className={`btn quickFilterBtn ${quickFilter === "all" ? "quickFilterBtnActive" : ""}`}
+              onClick={() => setQuickFilter("all")}
+            >
+              Tutti ({quickFilterCounts.all})
+            </button>
+            <button
+              className={`btn quickFilterBtn ${quickFilter === "expired" ? "quickFilterBtnActive" : ""}`}
+              onClick={() => setQuickFilter("expired")}
+            >
+              Scaduti ({quickFilterCounts.expired})
+            </button>
+            <button
+              className={`btn quickFilterBtn ${quickFilter === "today" ? "quickFilterBtnActive" : ""}`}
+              onClick={() => setQuickFilter("today")}
+            >
+              Oggi ({quickFilterCounts.today})
+            </button>
+            <button
+              className={`btn quickFilterBtn ${quickFilter === "soon" ? "quickFilterBtnActive" : ""}`}
+              onClick={() => setQuickFilter("soon")}
+            >
+              ≤ 7 giorni ({quickFilterCounts.soon})
+            </button>
+            <button
+              className={`btn quickFilterBtn ${quickFilter === "active" ? "quickFilterBtnActive" : ""}`}
+              onClick={() => setQuickFilter("active")}
+            >
+              Attivi ({quickFilterCounts.active})
+            </button>
+          </div>
 
           <h2>Assegna settimana</h2>
           <p style={{ opacity: 0.8 }}>
@@ -248,28 +472,29 @@ function CoachAthletesInner() {
           </select>
         </div>
 
-        {filteredAthletes.map((a) => {
+        {filteredAthletes.map((row) => {
+          const a = row.athlete;
           const alreadyAssigned = !!alreadyAssignedMap[a.uid];
-          const expired = isSubscriptionExpired(a.subscriptionExpiresAt);
-          const expiry =
-            a.subscriptionExpiresAt?.toDate?.() instanceof Date
-              ? a.subscriptionExpiresAt.toDate()
-              : a.subscriptionExpiresAt instanceof Date
-              ? a.subscriptionExpiresAt
-              : null;
+          const expired = row.expired;
+          const expiry = row.expiry;
+          const daysUntilExpiry = row.daysUntilExpiry;
+          const status = getStatusInfo(expired, daysUntilExpiry);
 
           const expiryValue = expiry ? toDateInputValue(expiry) : "";
 
           return (
             <div key={a.uid} className="card" style={{ marginTop: 16 }}>
               <h3 style={{ marginBottom: 6 }}>
-                {a.firstName && a.lastName
-                  ? `${a.firstName} ${a.lastName}`
-                  : a.email || "Atleta"}
+                {row.fullName}
               </h3>
+              <div style={{ marginBottom: 12 }}>
+                <span className={`badge subscriptionBadge subscriptionBadge_${status.kind}`}>
+                  {status.label}
+                </span>
+              </div>
 
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div className="athleteCardControls">
+                <div className="athleteExpiryBlock">
                   <label style={{ fontSize: 12, opacity: 0.75 }}>Scadenza abbonamento</label>
                   <input
                     className="input"
@@ -279,6 +504,9 @@ function CoachAthletesInner() {
                       if (e.target.value) setExpiry(a.uid, e.target.value);
                     }}
                   />
+                  <div style={{ fontSize: 12, opacity: 0.75 }}>
+                    {status.detail}
+                  </div>
                 </div>
 
                 <button
@@ -317,7 +545,9 @@ function CoachAthletesInner() {
 
         {filteredAthletes.length === 0 && (
           <div className="card" style={{ marginTop: 16 }}>
-            {athletes.length === 0 ? "Nessun atleta trovato." : "Nessun atleta corrisponde alla ricerca."}
+            {athletes.length === 0
+              ? "Nessun atleta trovato."
+              : "Nessun atleta corrisponde ai filtri o alla ricerca."}
           </div>
         )}
       </div>
