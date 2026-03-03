@@ -74,7 +74,7 @@ function AthleteHomeInner() {
 
   useEffect(() => {
     if (!user?.uid || !subscriptionExpiry || isExpired) return;
-    if (daysUntilExpiry !== 2) return;
+    if (daysUntilExpiry !== 7) return;
 
     const yyyy = subscriptionExpiry.getFullYear();
     const mm = String(subscriptionExpiry.getMonth() + 1).padStart(2, "0");
@@ -84,7 +84,7 @@ function AthleteHomeInner() {
     createUniqueInAppNotification(user.uid, `subscription-expiring-${key}`, {
       type: "subscription_expiring",
       title: "Abbonamento in scadenza",
-      message: "Il tuo abbonamento scade tra 2 giorni.",
+      message: "Il tuo abbonamento scade tra 7 giorni.",
       link: "/athlete-home",
     }).catch(() => {});
   }, [daysUntilExpiry, isExpired, subscriptionExpiry, user?.uid]);
