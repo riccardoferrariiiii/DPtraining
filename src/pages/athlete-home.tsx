@@ -131,6 +131,19 @@ function AthleteHomeInner() {
 
         {/* Weeks List */}
         <div className="card" style={{ marginTop: 20 }}>
+          <div className="row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <h2 style={{ margin: 0 }}>Personal Records</h2>
+            <Link href="/athlete/pr" className="btn btnPrimary">
+              Vai ai PR
+            </Link>
+          </div>
+
+          <div style={{ opacity: 0.8, marginBottom: 16 }}>
+            Inserisci e aggiorna i tuoi massimali e benchmark WOD.
+          </div>
+
+          <div className="hr" />
+
           <h2>Settimane di Programma</h2>
           {isExpired ? (
             <div style={{ marginTop: 12, color: "#ff6b6b" }}>

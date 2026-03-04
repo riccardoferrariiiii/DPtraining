@@ -591,6 +591,13 @@ function CoachAthletesInner() {
                 </button>
 
                 <button
+                  className="btn"
+                  onClick={() => router.push(`/coach/prs?athleteUid=${a.uid}`)}
+                >
+                  Visualizza PR
+                </button>
+
+                <button
                   className="btn btnDanger"
                   onClick={() => requestDeleteAthlete(a)}
                   disabled={deletingUid === a.uid}
