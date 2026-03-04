@@ -20,6 +20,7 @@ type PrItem = {
   name: string;
   kind: PrKind;
   timeValue?: string;
+  timeSeconds?: number;
   weightKg?: number;
   reps?: number;
   recordedAt?: any;
@@ -52,9 +53,19 @@ function getKindUi(kind: PrKind) {
   }
 
   return {
-    badge: { borderColor: "rgba(255,255,255,0.35)", background: "rgba(255,255,255,0.12)" },
-    card: { borderColor: "rgba(255,255,255,0.24)" },
+    badge: { borderColor: "rgba(255,170,70,0.65)", background: "rgba(255,170,70,0.2)" },
+    card: { borderColor: "rgba(255,170,70,0.45)" },
   };
+}
+
+function formatTimeValue(totalSeconds?: number, fallback?: string) {
+  if (Number.isFinite(totalSeconds) && (totalSeconds as number) >= 0) {
+    const minutes = Math.floor((totalSeconds as number) / 60);
+    const seconds = Math.floor((totalSeconds as number) % 60);
+    return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+
+  return fallback || "00:00";
 }
 
 export default function CoachAthletePrPage() {
@@ -73,6 +84,7 @@ function CoachAthletePrInner() {
   const [filter, setFilter] = useState<PrFilter>("all");
   const [searchText, setSearchText] = useState("");
   const [items, setItems] = useState<PrItem[]>([]);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     if (!athleteUid) return;
@@ -91,14 +103,22 @@ function CoachAthletePrInner() {
     loadAthlete();
 
     const q = query(collection(db, "users", athleteUid, "prs"), orderBy("updatedAt", "desc"));
-    const unsub = onSnapshot(q, (snap) => {
-      setItems(
-        snap.docs.map((d) => ({
-          id: d.id,
-          ...(d.data() as any),
-        })) as PrItem[]
-      );
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setLoadError("");
+        setItems(
+          snap.docs.map((d) => ({
+            id: d.id,
+            ...(d.data() as any),
+          })) as PrItem[]
+        );
+      },
+      (error) => {
+        setItems([]);
+        setLoadError(error.message);
+      }
+    );
 
     return () => unsub();
   }, [athleteUid]);
@@ -121,6 +141,12 @@ function CoachAthletePrInner() {
       <div className="container">
         <div className="card" style={{ marginTop: 20 }}>
           <h2>Visualizza PR</h2>
+
+          {loadError && (
+            <div style={{ marginTop: 10, color: "#ff6b6b" }}>
+              Errore caricamento PR: {loadError}
+            </div>
+          )}
 
           <div style={{ marginTop: 12 }}>
             <input
@@ -170,7 +196,7 @@ function CoachAthletePrInner() {
 
                 <div style={{ marginTop: 10 }}>
                   {item.kind === "time" ? (
-                    <div>Tempo: <strong>{item.timeValue || "-"}</strong></div>
+                    <div>Tempo: <strong>{formatTimeValue(item.timeSeconds, item.timeValue)}</strong></div>
                   ) : (
                     <div>
                       <strong>{item.weightKg ?? "-"} kg</strong>

@@ -12,7 +12,7 @@ self.__BUILD_MANIFEST = {
     "static/chunks/28e763221106b0e7.js"
   ],
   "/athlete/pr": [
-    "static/chunks/84807fc5ecc33ffc.js"
+    "static/chunks/9a8ef5e1036bf4c8.js"
   ],
   "/athlete/week": [
     "static/chunks/4e9f88092e0ed130.js"
@@ -33,7 +33,7 @@ self.__BUILD_MANIFEST = {
     "static/chunks/c0920cd8e8a99821.js"
   ],
   "/coach/prs": [
-    "static/chunks/2eeafdece814d868.js"
+    "static/chunks/192884c0ad9503a7.js"
   ],
   "/coach/template/[id]": [
     "static/chunks/17c904b2b4d8fb0e.js"

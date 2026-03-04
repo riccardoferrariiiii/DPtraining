@@ -24,6 +24,7 @@ type PrItem = {
   normalizedName: string;
   kind: PrKind;
   timeValue?: string;
+  timeSeconds?: number;
   weightKg?: number;
   reps?: number;
   createdAt?: any;
@@ -40,11 +41,16 @@ function normalizePrName(raw: string) {
     .toLowerCase();
 }
 
-function prDocId(kind: PrKind, normalizedName: string) {
+function prDocId(kind: PrKind, normalizedName: string, reps?: number) {
   const slug = normalizedName
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
+
+  if (kind === "weight") {
+    const repsPart = Number.isFinite(reps) && (reps as number) > 0 ? `__r${Math.round(reps as number)}` : "__r1";
+    return `${kind}__${slug || "pr"}${repsPart}`;
+  }
 
   return `${kind}__${slug || "pr"}`;
 }
@@ -59,9 +65,9 @@ function getKindUi(kind: PrKind) {
   }
 
   return {
-    badge: { borderColor: "rgba(255,255,255,0.35)", background: "rgba(255,255,255,0.12)" },
-    card: { borderColor: "rgba(255,255,255,0.24)" },
-    editBtn: { borderColor: "rgba(255,255,255,0.35)", background: "rgba(255,255,255,0.12)" },
+    badge: { borderColor: "rgba(255,170,70,0.65)", background: "rgba(255,170,70,0.2)" },
+    card: { borderColor: "rgba(255,170,70,0.45)" },
+    editBtn: { borderColor: "rgba(255,170,70,0.65)", background: "rgba(255,170,70,0.2)" },
   };
 }
 
@@ -86,6 +92,41 @@ function toDateLabel(raw: any) {
   });
 }
 
+function formatTimeValue(totalSeconds?: number, fallback?: string) {
+  if (Number.isFinite(totalSeconds) && (totalSeconds as number) >= 0) {
+    const minutes = Math.floor((totalSeconds as number) / 60);
+    const seconds = Math.floor((totalSeconds as number) % 60);
+    return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+
+  return fallback || "00:00";
+}
+
+function parseToMinSec(item: PrItem) {
+  if (Number.isFinite(item.timeSeconds) && (item.timeSeconds as number) >= 0) {
+    const total = item.timeSeconds as number;
+    return {
+      minutes: String(Math.floor(total / 60)),
+      seconds: String(Math.floor(total % 60)).padStart(2, "0"),
+    };
+  }
+
+  const raw = (item.timeValue || "").trim();
+  const match = raw.match(/^(\d{1,3})[:m]\s*(\d{1,2})s?$/i) || raw.match(/^(\d{1,3})\s*:\s*(\d{1,2})$/);
+  if (match) {
+    const minutes = Number(match[1]);
+    const seconds = Number(match[2]);
+    if (Number.isFinite(minutes) && Number.isFinite(seconds)) {
+      return {
+        minutes: String(Math.max(0, minutes)),
+        seconds: String(Math.min(59, Math.max(0, seconds))).padStart(2, "0"),
+      };
+    }
+  }
+
+  return { minutes: "0", seconds: "00" };
+}
+
 export default function AthletePrPage() {
   return (
     <RoleGuard role="athlete">
@@ -104,7 +145,8 @@ function AthletePrInner() {
 
   const [name, setName] = useState("");
   const [kind, setKind] = useState<PrKind>("time");
-  const [timeValue, setTimeValue] = useState("");
+  const [timeMinutes, setTimeMinutes] = useState("0");
+  const [timeSecondsPart, setTimeSecondsPart] = useState("00");
   const [weightKg, setWeightKg] = useState("");
   const [reps, setReps] = useState("");
 
@@ -120,14 +162,22 @@ function AthletePrInner() {
     if (!user?.uid) return;
 
     const q = query(collection(db, "users", user.uid, "prs"), orderBy("updatedAt", "desc"));
-    const unsub = onSnapshot(q, (snap) => {
-      setItems(
-        snap.docs.map((d) => ({
-          id: d.id,
-          ...(d.data() as any),
-        })) as PrItem[]
-      );
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setItems(
+          snap.docs.map((d) => ({
+            id: d.id,
+            ...(d.data() as any),
+          })) as PrItem[]
+        );
+      },
+      (error) => {
+        setItems([]);
+        setConfirmMessage(`Errore caricamento PR: ${error.message}`);
+        setConfirmType("error");
+      }
+    );
 
     return () => unsub();
   }, [user?.uid]);
@@ -148,7 +198,8 @@ function AthletePrInner() {
     setEditingId(null);
     setName("");
     setKind("time");
-    setTimeValue("");
+    setTimeMinutes("0");
+    setTimeSecondsPart("00");
     setWeightKg("");
     setReps("");
   };
@@ -162,7 +213,9 @@ function AthletePrInner() {
     setEditingId(item.id);
     setName(item.name || "");
     setKind(item.kind);
-    setTimeValue(item.timeValue || "");
+    const parsedTime = parseToMinSec(item);
+    setTimeMinutes(parsedTime.minutes);
+    setTimeSecondsPart(parsedTime.seconds);
     setWeightKg(item.weightKg !== undefined && item.weightKg !== null ? String(item.weightKg) : "");
     setReps(item.reps !== undefined && item.reps !== null ? String(item.reps) : "");
     setIsModalOpen(true);
@@ -231,13 +284,30 @@ function AthletePrInner() {
     };
 
     if (kind === "time") {
-      const cleanedTime = timeValue.trim();
-      if (!cleanedTime) {
-        setConfirmMessage("Inserisci il tempo del WOD benchmark.");
+      const minutes = Number(timeMinutes);
+      const seconds = Number(timeSecondsPart);
+
+      if (!Number.isFinite(minutes) || minutes < 0) {
+        setConfirmMessage("Inserisci minuti validi.");
         setConfirmType("warning");
         return;
       }
-      payload.timeValue = cleanedTime;
+
+      if (!Number.isFinite(seconds) || seconds < 0 || seconds > 59) {
+        setConfirmMessage("Inserisci secondi validi (0-59).");
+        setConfirmType("warning");
+        return;
+      }
+
+      const totalSeconds = Math.floor(minutes) * 60 + Math.floor(seconds);
+      if (totalSeconds <= 0) {
+        setConfirmMessage("Il tempo deve essere maggiore di 00:00.");
+        setConfirmType("warning");
+        return;
+      }
+
+      payload.timeSeconds = totalSeconds;
+      payload.timeValue = `${String(Math.floor(minutes)).padStart(2, "0")}:${String(Math.floor(seconds)).padStart(2, "0")}`;
       payload.weightKg = null;
       payload.reps = null;
     }
@@ -261,9 +331,10 @@ function AthletePrInner() {
       payload.weightKg = parsedWeight;
       payload.reps = Math.round(parsedReps);
       payload.timeValue = null;
+      payload.timeSeconds = null;
     }
 
-    const id = prDocId(kind, normalizedName);
+    const id = prDocId(kind, normalizedName, kind === "weight" ? Math.round(toNumber(reps) || 0) : undefined);
 
     setSaving(true);
     try {
@@ -357,7 +428,7 @@ function AthletePrInner() {
 
                 <div style={{ marginTop: 10 }}>
                   {item.kind === "time" ? (
-                    <div>Tempo: <strong>{item.timeValue || "-"}</strong></div>
+                    <div>Tempo: <strong>{formatTimeValue(item.timeSeconds, item.timeValue)}</strong></div>
                   ) : (
                     <div>
                       <strong>{item.weightKg ?? "-"} kg</strong>
@@ -447,12 +518,36 @@ function AthletePrInner() {
             {kind === "time" ? (
               <div style={{ marginTop: 12 }}>
                 <label style={{ fontSize: 12, opacity: 0.75 }}>Tempo</label>
-                <input
-                  className="input"
-                  placeholder="Es. 08:32 oppure 12m 10s"
-                  value={timeValue}
-                  onChange={(e) => setTimeValue(e.target.value)}
-                />
+                <div className="grid" style={{ gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 10 }}>
+                  <div>
+                    <label style={{ fontSize: 12, opacity: 0.75, display: "block", marginBottom: 6 }}>Minuti</label>
+                    <input
+                      className="input"
+                      type="number"
+                      min={0}
+                      max={180}
+                      value={timeMinutes}
+                      onChange={(e) => setTimeMinutes(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12, opacity: 0.75, display: "block", marginBottom: 6 }}>Secondi</label>
+                    <select
+                      className="input"
+                      value={timeSecondsPart}
+                      onChange={(e) => setTimeSecondsPart(e.target.value)}
+                    >
+                      {Array.from({ length: 60 }).map((_, idx) => {
+                        const value = String(idx).padStart(2, "0");
+                        return (
+                          <option key={value} value={value}>
+                            {value}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                </div>
               </div>
             ) : (
               <div style={{ marginTop: 12 }}>
