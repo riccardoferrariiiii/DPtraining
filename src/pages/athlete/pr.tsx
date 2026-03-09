@@ -190,7 +190,7 @@ function AthletePrInner() {
       if (!matchesFilter) return false;
       if (!q) return true;
 
-      return item.name.toLowerCase().includes(q);
+      return (item.name || "").toLowerCase().includes(q);
     });
   }, [filter, items, searchText]);
 
@@ -418,10 +418,10 @@ function AthletePrInner() {
         ) : (
           <div className="stack" style={{ marginTop: 16 }}>
             {filtered.map((item) => (
-              <div key={item.id} className="card" style={getKindUi(item.kind).card}>
+              <div key={item.id} className="card" style={getKindUi(item.kind || "time").card}>
                 <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                  <h3 style={{ margin: 0 }}>{item.name}</h3>
-                  <span className="badge" style={getKindUi(item.kind).badge}>
+                  <h3 style={{ margin: 0 }}>{item.name || "PR"}</h3>
+                  <span className="badge" style={getKindUi(item.kind || "time").badge}>
                     {item.kind === "time" ? "WOD tempo" : "PR chili"}
                   </span>
                 </div>
@@ -442,7 +442,7 @@ function AthletePrInner() {
                 </div>
 
                 <div className="row" style={{ marginTop: 12 }}>
-                  <button className="btn" style={getKindUi(item.kind).editBtn} onClick={() => openEditModal(item)}>
+                  <button className="btn" style={getKindUi(item.kind || "time").editBtn} onClick={() => openEditModal(item)}>
                     Modifica PR
                   </button>
                   <button className="btn btnDanger" onClick={() => requestDeletePr(item)}>
