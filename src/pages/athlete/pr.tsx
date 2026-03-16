@@ -111,7 +111,7 @@ function estimateOneRepMax(weightKg?: number, reps?: number) {
   return (weightKg as number) * (1 + safeReps / 30);
 }
 
-function roundToIncrement(value: number, increment: number) {
+function roundToIncrement(value: number, increment?: number | null) {
   if (!Number.isFinite(value)) return null;
   if (!Number.isFinite(increment) || increment <= 0) return value;
   return Math.round(value / increment) * increment;
@@ -171,7 +171,7 @@ function AthletePrInner() {
   const [searchText, setSearchText] = useState("");
   const [selectedPercentagePrId, setSelectedPercentagePrId] = useState("");
   const [customPercentage, setCustomPercentage] = useState("75");
-  const [roundingStep, setRoundingStep] = useState("2.5");
+  const [roundingStep, setRoundingStep] = useState("2");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -248,8 +248,9 @@ function AthletePrInner() {
   );
 
   const selectedRoundingStep = useMemo(() => {
+    if (roundingStep === "none") return null;
     const parsed = toNumber(roundingStep);
-    return parsed && parsed > 0 ? parsed : 2.5;
+    return parsed && parsed > 0 ? parsed : 2;
   }, [roundingStep]);
 
   const customPercentageValue = useMemo(() => toNumber(customPercentage), [customPercentage]);
@@ -522,9 +523,10 @@ function AthletePrInner() {
                     Arrotonda a
                   </label>
                   <select className="input" value={roundingStep} onChange={(e) => setRoundingStep(e.target.value)}>
+                    <option value="none">Nessun arrotondamento</option>
                     <option value="0.5">0,5 kg</option>
                     <option value="1">1 kg</option>
-                    <option value="2.5">2,5 kg</option>
+                    <option value="2">2 kg</option>
                     <option value="5">5 kg</option>
                   </select>
                 </div>

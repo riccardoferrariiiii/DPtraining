@@ -187,6 +187,7 @@ function CoachAthletesInner() {
   const [searchAthlete, setSearchAthlete] = useState("");
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+  const [searchTemplate, setSearchTemplate] = useState("");
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
   const [sortMode, setSortMode] = useState<SortMode>("smart");
   const [alreadyAssignedMap, setAlreadyAssignedMap] = useState<Record<string, boolean>>({});
@@ -241,6 +242,22 @@ function CoachAthletesInner() {
   const templateTitle = useMemo(() => {
     return templates.find((t) => t.id === selectedTemplate)?.title || "";
   }, [templates, selectedTemplate]);
+
+  const visibleTemplates = useMemo(() => {
+    const query = searchTemplate.trim().toLowerCase();
+    if (!query) return templates;
+
+    const filtered = templates.filter((template) =>
+      template.title.toLowerCase().includes(query)
+    );
+
+    const selected = templates.find((template) => template.id === selectedTemplate);
+    if (selected && !filtered.some((template) => template.id === selected.id)) {
+      return [selected, ...filtered];
+    }
+
+    return filtered;
+  }, [searchTemplate, selectedTemplate, templates]);
 
   const athleteRows = useMemo<AthleteRow[]>(() => {
     return athletes.map((athlete) => {
@@ -483,18 +500,33 @@ function CoachAthletesInner() {
             Seleziona una settimana e poi assegnala agli atleti che vuoi.
           </p>
 
+          <input
+            className="input"
+            style={{ marginTop: 10 }}
+            type="text"
+            placeholder="Cerca settimana per titolo"
+            value={searchTemplate}
+            onChange={(e) => setSearchTemplate(e.target.value)}
+          />
+
           <select
             className="input selectPremium"
             style={{ marginTop: 10 }}
             value={selectedTemplate}
             onChange={(e) => setSelectedTemplate(e.target.value)}
           >
-            {templates.map((t) => (
+            {visibleTemplates.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.title}
               </option>
             ))}
           </select>
+
+          {searchTemplate.trim() && visibleTemplates.length === 0 && (
+            <div className="small" style={{ marginTop: 8 }}>
+              Nessuna settimana trovata con questo filtro.
+            </div>
+          )}
         </div>
 
         {filteredAthletes.map((row) => {
