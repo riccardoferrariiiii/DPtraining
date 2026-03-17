@@ -13,29 +13,29 @@ export function RoleGuard({
 }) {
   const router = useRouter();
   const { user, profile, loading } = useSession();
+  const resolvedRole: Role = profile?.role === "coach" ? "coach" : "athlete";
 
   if (loading) return <div className="container">Caricamento...</div>;
   if (!user) return <div className="container">Devi fare login.</div>;
-  if (!profile) return <div className="container">Profilo non caricato.</div>;
 
   const hasAccess =
-    profile.role === role ||
-    (profile.role === "coach" && role === "athlete"); // coach può entrare anche in atleta
+    resolvedRole === role ||
+    (resolvedRole === "coach" && role === "athlete"); // coach può entrare anche in atleta
 
   // 🔥 AUTO-FIX: se stai nella pagina sbagliata ti rimanda dove devi stare
   useEffect(() => {
     if (hasAccess) return;
 
-    if (profile.role === "athlete") {
+    if (resolvedRole === "athlete") {
       router.replace("/athlete/weeks");
       return;
     }
 
-    if (profile.role === "coach") {
+    if (resolvedRole === "coach") {
       router.replace("/coach/program");
       return;
     }
-  }, [hasAccess, profile.role, router]);
+  }, [hasAccess, resolvedRole, router]);
 
   if (!hasAccess) {
     return (
@@ -45,7 +45,7 @@ export function RoleGuard({
           <div style={{ marginTop: 10, opacity: 0.8, fontSize: 14 }}>
             Role richiesto: {role}
             <br />
-            Role letto dal DB: {String(profile.role)}
+            Role letto dal DB: {String(profile?.role || "athlete (fallback)")}
           </div>
 
           <div style={{ marginTop: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>

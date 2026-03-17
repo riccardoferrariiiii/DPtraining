@@ -15,8 +15,11 @@ export default function Index() {
       return;
     }
 
-    // profilo non pronto ancora -> aspetta
-    if (!profile) return;
+    // fallback robusto: non restare bloccato se il profilo ritarda.
+    if (!profile) {
+      router.replace("/athlete-home");
+      return;
+    }
 
     // smistamento
     if (profile.role === "coach") router.replace("/coach/program");
