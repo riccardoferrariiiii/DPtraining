@@ -15,9 +15,9 @@ export default function Index() {
       return;
     }
 
-    // fallback robusto: non restare bloccato se il profilo ritarda.
+    // Aspetta il profilo per evitare redirect nel ruolo sbagliato
+    // quando si cambia account (es. atleta -> coach).
     if (!profile) {
-      router.replace("/athlete-home");
       return;
     }
 

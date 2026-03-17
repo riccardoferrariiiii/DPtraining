@@ -86,12 +86,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         resolved = true;
         window.clearTimeout(timeoutId);
         setUser(u);
-        setLoading(false);
+        if (!u) {
+          setProfile(null);
+          setLoading(false);
+          return;
+        }
+
+        // Keep loading true until profile listener resolves the role.
+        setLoading(true);
       },
       () => {
         resolved = true;
         window.clearTimeout(timeoutId);
         setUser(null);
+        setProfile(null);
         setLoading(false);
       }
     );
@@ -105,22 +113,27 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) {
       setProfile(null);
+      setLoading(false);
       return;
     }
 
+    setLoading(true);
     const ref = doc(db, "users", user.uid);
     const unsubProfile = onSnapshot(
       ref,
       (snap) => {
         if (!snap.exists()) {
           setProfile({ role: "athlete", email: user.email || "" });
+          setLoading(false);
           return;
         }
         setProfile(snap.data() as Profile);
+        setLoading(false);
       },
       () => {
         // Fallback: evita schermate bloccate anche se il profilo non e leggibile.
         setProfile({ role: "athlete", email: user.email || "" });
+        setLoading(false);
       }
     );
 
