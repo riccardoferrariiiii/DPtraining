@@ -73,12 +73,33 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      setLoading(false);
-    });
+    let resolved = false;
+    const timeoutId = window.setTimeout(() => {
+      if (!resolved) {
+        setLoading(false);
+      }
+    }, 5000);
 
-    return () => unsubAuth();
+    const unsubAuth = onAuthStateChanged(
+      auth,
+      (u) => {
+        resolved = true;
+        window.clearTimeout(timeoutId);
+        setUser(u);
+        setLoading(false);
+      },
+      () => {
+        resolved = true;
+        window.clearTimeout(timeoutId);
+        setUser(null);
+        setLoading(false);
+      }
+    );
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      unsubAuth();
+    };
   }, []);
 
   useEffect(() => {
@@ -88,13 +109,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
 
     const ref = doc(db, "users", user.uid);
-    const unsubProfile = onSnapshot(ref, (snap) => {
-      if (!snap.exists()) {
+    const unsubProfile = onSnapshot(
+      ref,
+      (snap) => {
+        if (!snap.exists()) {
+          setProfile({ role: "athlete", email: user.email || "" });
+          return;
+        }
+        setProfile(snap.data() as Profile);
+      },
+      () => {
+        // Fallback: evita schermate bloccate anche se il profilo non e leggibile.
         setProfile({ role: "athlete", email: user.email || "" });
-        return;
       }
-      setProfile(snap.data() as Profile);
-    });
+    );
 
     return () => unsubProfile();
   }, [user]);
@@ -114,8 +142,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 export function useSession(): Session {
   const v = useContext(SessionContext);
   if (!v) {
-    // così non esplode più in caso di file strani durante hot reload
-    return { user: null, profile: null, loading: true };
+    // Fallback difensivo: meglio mostrare login che restare in caricamento infinito.
+    return { user: null, profile: null, loading: false };
   }
   return v;
 } 

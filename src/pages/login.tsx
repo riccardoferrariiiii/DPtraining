@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { useRouter } from "next/router";
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, setPersistence, browserLocalPersistence } from "firebase/auth";
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence,
+} from "firebase/auth";
 import { auth, db } from "../lib/firebase";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 
@@ -12,17 +18,15 @@ export default function Login() {
   const [lastName, setLastName] = useState("");
   const [loading, setLoading] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [confirmMessage, setConfirmMessage] = useState("");
   const [confirmType, setConfirmType] = useState<"success" | "error" | "warning">("success");
 
   const login = async () => {
     setLoading(true);
     try {
-      // Abilita persistenza locale se "Ricordami" è spuntato
-      if (rememberMe) {
-        await setPersistence(auth, browserLocalPersistence);
-      }
+      // Persiste login sul browser corrente oppure solo per la sessione.
+      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
       await signInWithEmailAndPassword(auth, email, password);
       router.push("/");
     } catch (e: any) {
@@ -42,6 +46,7 @@ export default function Login() {
 
     setLoading(true);
     try {
+      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
       const userCred = await createUserWithEmailAndPassword(auth, email, password);
       const uid = userCred.user.uid;
 
