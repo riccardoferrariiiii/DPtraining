@@ -68,6 +68,40 @@ function formatTimeValue(totalSeconds?: number, fallback?: string) {
   return fallback || "00:00";
 }
 
+function toNumber(value: string) {
+  const parsed = Number(value.replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function estimateOneRepMax(weightKg?: number, reps?: number) {
+  if (!Number.isFinite(weightKg) || (weightKg as number) <= 0) return null;
+
+  const safeReps = Number.isFinite(reps) && (reps as number) > 0 ? Math.round(reps as number) : 1;
+  if (safeReps <= 1) return weightKg as number;
+
+  return (weightKg as number) * (1 + safeReps / 30);
+}
+
+function roundToIncrement(value: number, increment?: number | null) {
+  if (!Number.isFinite(value)) return null;
+  if (!Number.isFinite(increment) || increment <= 0) return value;
+  return Math.round(value / increment) * increment;
+}
+
+function formatKg(value?: number | null) {
+  if (!Number.isFinite(value as number)) return "-";
+  return new Intl.NumberFormat("it-IT", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(value as number);
+}
+
+function buildWeightPrLabel(item: PrItem) {
+  const weightLabel = Number.isFinite(item.weightKg) ? `${formatKg(item.weightKg)} kg` : "- kg";
+  const repsLabel = Number.isFinite(item.reps) && (item.reps as number) > 0 ? ` x ${item.reps}` : "";
+  return `${item.name || "PR"} • ${weightLabel}${repsLabel}`;
+}
+
 export default function CoachAthletePrPage() {
   return (
     <RoleGuard role="coach">
@@ -85,6 +119,9 @@ function CoachAthletePrInner() {
   const [searchText, setSearchText] = useState("");
   const [items, setItems] = useState<PrItem[]>([]);
   const [loadError, setLoadError] = useState("");
+  const [selectedPercentagePrId, setSelectedPercentagePrId] = useState("");
+  const [customPercentage, setCustomPercentage] = useState("75");
+  const [roundingStep, setRoundingStep] = useState("2");
 
   useEffect(() => {
     if (!athleteUid) return;
@@ -135,6 +172,42 @@ function CoachAthletePrInner() {
     });
   }, [filter, items, searchText]);
 
+  const weightPrItems = useMemo(
+    () =>
+      items.filter(
+        (item) =>
+          item.kind === "weight" &&
+          Number.isFinite(item.weightKg) &&
+          (item.weightKg as number) > 0
+      ),
+    [items]
+  );
+
+  const selectedPercentagePr = useMemo(() => {
+    if (weightPrItems.length === 0) return null;
+    return weightPrItems.find((item) => item.id === selectedPercentagePrId) || weightPrItems[0];
+  }, [selectedPercentagePrId, weightPrItems]);
+
+  const selectedOneRepMax = useMemo(
+    () => estimateOneRepMax(selectedPercentagePr?.weightKg, selectedPercentagePr?.reps),
+    [selectedPercentagePr]
+  );
+
+  const selectedRoundingStep = useMemo(() => {
+    if (roundingStep === "none") return null;
+    const parsed = toNumber(roundingStep);
+    return parsed && parsed > 0 ? parsed : 2;
+  }, [roundingStep]);
+
+  const customPercentageValue = useMemo(() => toNumber(customPercentage), [customPercentage]);
+
+  const presetPercentages = useMemo(() => [50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100], []);
+
+  const customCalculatedWeight = useMemo(() => {
+    if (!selectedOneRepMax || customPercentageValue === null || customPercentageValue <= 0) return null;
+    return roundToIncrement((selectedOneRepMax * customPercentageValue) / 100, selectedRoundingStep);
+  }, [customPercentageValue, selectedOneRepMax, selectedRoundingStep]);
+
   return (
     <>
       <TopBar title={`PR atleta: ${athleteName}`} />
@@ -177,6 +250,111 @@ function CoachAthletePrInner() {
               PR di chili ({items.filter((item) => item.kind === "weight").length})
             </button>
           </div>
+        </div>
+
+        <div className="card" style={{ marginTop: 16 }}>
+          <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <h3 style={{ margin: 0 }}>Calcolatore percentuali</h3>
+              <div className="small" style={{ marginTop: 6 }}>
+                Calcolo rapido dei kg alle varie percentuali del massimale dell&apos;atleta.
+              </div>
+            </div>
+            {selectedOneRepMax && (
+              <span className="badge" style={{ borderColor: "rgba(255,255,255,0.22)" }}>
+                1RM {selectedPercentagePr?.reps && selectedPercentagePr.reps > 1 ? "stimato" : "base"}: {formatKg(selectedOneRepMax)} kg
+              </span>
+            )}
+          </div>
+
+          {weightPrItems.length === 0 ? (
+            <div className="small" style={{ marginTop: 12 }}>
+              Nessun PR di chili disponibile per questo atleta.
+            </div>
+          ) : (
+            <>
+              <div className="percentageCalcGrid" style={{ marginTop: 14 }}>
+                <div>
+                  <label style={{ fontSize: 12, opacity: 0.75, display: "block", marginBottom: 6 }}>
+                    PR di riferimento
+                  </label>
+                  <select
+                    className="input"
+                    value={selectedPercentagePr?.id || ""}
+                    onChange={(e) => setSelectedPercentagePrId(e.target.value)}
+                  >
+                    {weightPrItems.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {buildWeightPrLabel(item)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 12, opacity: 0.75, display: "block", marginBottom: 6 }}>
+                    Arrotonda a
+                  </label>
+                  <select className="input" value={roundingStep} onChange={(e) => setRoundingStep(e.target.value)}>
+                    <option value="none">Nessun arrotondamento</option>
+                    <option value="0.5">0,5 kg</option>
+                    <option value="1">1 kg</option>
+                    <option value="2">2 kg</option>
+                    <option value="5">5 kg</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 12, opacity: 0.75, display: "block", marginBottom: 6 }}>
+                    Percentuale personalizzata
+                  </label>
+                  <input
+                    className="input"
+                    inputMode="decimal"
+                    placeholder="Es. 77,5"
+                    value={customPercentage}
+                    onChange={(e) => setCustomPercentage(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {selectedPercentagePr && (
+                <div className="small" style={{ marginTop: 12 }}>
+                  PR selezionato: {buildWeightPrLabel(selectedPercentagePr)}
+                  {selectedPercentagePr.reps && selectedPercentagePr.reps > 1
+                    ? ` • massimale stimato con formula Epley`
+                    : " • massimale diretto"}
+                </div>
+              )}
+
+              <div className="percentageHighlight" style={{ marginTop: 14 }}>
+                <div className="small">Carico alla percentuale inserita</div>
+                <div className="percentageHighlightValue">
+                  {customPercentageValue && customPercentageValue > 0 ? `${formatKg(customCalculatedWeight)} kg` : "Inserisci una percentuale valida"}
+                </div>
+                <div className="small">
+                  {customPercentageValue && customPercentageValue > 0
+                    ? `${formatKg(customPercentageValue)}% di ${formatKg(selectedOneRepMax)} kg`
+                    : "Sono accettati anche valori decimali, ad esempio 72,5"}
+                </div>
+              </div>
+
+              <div className="percentagePresetGrid" style={{ marginTop: 14 }}>
+                {presetPercentages.map((percentage) => {
+                  const calculatedWeight = selectedOneRepMax
+                    ? roundToIncrement((selectedOneRepMax * percentage) / 100, selectedRoundingStep)
+                    : null;
+
+                  return (
+                    <div key={percentage} className="percentagePresetCard">
+                      <div className="small">{percentage}%</div>
+                      <div className="percentagePresetValue">{formatKg(calculatedWeight)} kg</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
 
         {filtered.length === 0 ? (
