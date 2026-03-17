@@ -14,6 +14,7 @@ import {
 
 type PrKind = "time" | "weight";
 type PrFilter = "all" | "time" | "weight";
+type PrSort = "alpha" | "oldest" | "newest";
 
 type PrItem = {
   id: string;
@@ -102,6 +103,19 @@ function buildWeightPrLabel(item: PrItem) {
   return `${item.name || "PR"} • ${weightLabel}${repsLabel}`;
 }
 
+function toMillis(raw: any) {
+  if (raw?.toDate && typeof raw.toDate === "function") {
+    const parsed = raw.toDate();
+    return parsed instanceof Date && Number.isFinite(parsed.getTime()) ? parsed.getTime() : 0;
+  }
+
+  if (raw instanceof Date) {
+    return Number.isFinite(raw.getTime()) ? raw.getTime() : 0;
+  }
+
+  return 0;
+}
+
 export default function CoachAthletePrPage() {
   return (
     <RoleGuard role="coach">
@@ -116,6 +130,7 @@ function CoachAthletePrInner() {
 
   const [athleteName, setAthleteName] = useState("Atleta");
   const [filter, setFilter] = useState<PrFilter>("all");
+  const [sortBy, setSortBy] = useState<PrSort>("newest");
   const [searchText, setSearchText] = useState("");
   const [items, setItems] = useState<PrItem[]>([]);
   const [loadError, setLoadError] = useState("");
@@ -163,14 +178,26 @@ function CoachAthletePrInner() {
   const filtered = useMemo(() => {
     const q = searchText.trim().toLowerCase();
 
-    return items.filter((item) => {
+    const filteredItems = items.filter((item) => {
       const matchesFilter = filter === "all" ? true : item.kind === filter;
       if (!matchesFilter) return false;
       if (!q) return true;
 
       return (item.name || "").toLowerCase().includes(q);
     });
-  }, [filter, items, searchText]);
+
+    return [...filteredItems].sort((a, b) => {
+      if (sortBy === "alpha") {
+        return (a.name || "").localeCompare(b.name || "", "it", { sensitivity: "base" });
+      }
+
+      const aTime = toMillis(a.recordedAt || a.updatedAt || a.createdAt);
+      const bTime = toMillis(b.recordedAt || b.updatedAt || b.createdAt);
+
+      if (sortBy === "oldest") return aTime - bTime;
+      return bTime - aTime;
+    });
+  }, [filter, items, searchText, sortBy]);
 
   const weightPrItems = useMemo(
     () =>
@@ -228,6 +255,14 @@ function CoachAthletePrInner() {
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
             />
+          </div>
+
+          <div style={{ marginTop: 12 }}>
+            <select className="input" value={sortBy} onChange={(e) => setSortBy(e.target.value as PrSort)}>
+              <option value="newest">Data: dal piu nuovo al piu vecchio</option>
+              <option value="oldest">Data: dal piu vecchio al piu nuovo</option>
+              <option value="alpha">Nome: ordine alfabetico (A-Z)</option>
+            </select>
           </div>
 
           <div className="quickFilterRow" style={{ marginTop: 12 }}>
