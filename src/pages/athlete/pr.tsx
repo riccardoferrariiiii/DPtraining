@@ -12,6 +12,7 @@ import {
   query,
   serverTimestamp,
   setDoc,
+  Timestamp,
 } from "firebase/firestore";
 import { useEffect } from "react";
 
@@ -90,6 +91,50 @@ function toDateLabel(raw: any) {
     month: "2-digit",
     year: "numeric",
   });
+}
+
+function toInputDateValue(raw: any) {
+  const date = raw?.toDate?.() instanceof Date
+    ? raw.toDate()
+    : raw instanceof Date
+    ? raw
+    : null;
+
+  if (!date) return "";
+
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function todayInputDateValue() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function parseInputDate(value: string) {
+  const match = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(year, month - 1, day, 12, 0, 0, 0);
+
+  if (
+    !Number.isFinite(parsed.getTime()) ||
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return parsed;
 }
 
 function formatTimeValue(totalSeconds?: number, fallback?: string) {
@@ -181,6 +226,7 @@ function AthletePrInner() {
   const [timeSecondsPart, setTimeSecondsPart] = useState("00");
   const [weightKg, setWeightKg] = useState("");
   const [reps, setReps] = useState("");
+  const [recordedDate, setRecordedDate] = useState(todayInputDateValue());
 
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -270,6 +316,7 @@ function AthletePrInner() {
     setTimeSecondsPart("00");
     setWeightKg("");
     setReps("");
+    setRecordedDate(todayInputDateValue());
   };
 
   const openCreateModal = () => {
@@ -286,6 +333,7 @@ function AthletePrInner() {
     setTimeSecondsPart(parsedTime.seconds);
     setWeightKg(item.weightKg !== undefined && item.weightKg !== null ? String(item.weightKg) : "");
     setReps(item.reps !== undefined && item.reps !== null ? String(item.reps) : "");
+    setRecordedDate(toInputDateValue(item.recordedAt || item.updatedAt || item.createdAt) || todayInputDateValue());
     setIsModalOpen(true);
   };
 
@@ -348,8 +396,24 @@ function AthletePrInner() {
       normalizedName,
       kind,
       updatedAt: serverTimestamp(),
-      recordedAt: serverTimestamp(),
     };
+
+    const parsedRecordedDate = parseInputDate(recordedDate);
+    if (!parsedRecordedDate) {
+      setConfirmMessage("Inserisci una data valida per il PR.");
+      setConfirmType("warning");
+      return;
+    }
+
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    if (parsedRecordedDate.getTime() > today.getTime()) {
+      setConfirmMessage("La data del PR non puo essere nel futuro.");
+      setConfirmType("warning");
+      return;
+    }
+
+    payload.recordedAt = Timestamp.fromDate(parsedRecordedDate);
 
     if (kind === "time") {
       const minutes = Number(timeMinutes);
@@ -659,6 +723,19 @@ function AthletePrInner() {
                 placeholder="Es. Fran / Back Squat"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+              />
+            </div>
+
+            <div style={{ marginTop: 12 }}>
+              <label style={{ fontSize: 12, opacity: 0.75, display: "block", marginBottom: 6 }}>
+                Data registrazione PR
+              </label>
+              <input
+                className="input"
+                type="date"
+                max={todayInputDateValue()}
+                value={recordedDate}
+                onChange={(e) => setRecordedDate(e.target.value)}
               />
             </div>
 
