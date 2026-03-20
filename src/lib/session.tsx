@@ -73,18 +73,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let resolved = false;
-    const timeoutId = window.setTimeout(() => {
-      if (!resolved) {
-        setLoading(false);
-      }
-    }, 5000);
-
     const unsubAuth = onAuthStateChanged(
       auth,
       (u) => {
-        resolved = true;
-        window.clearTimeout(timeoutId);
         setUser(u);
         if (!u) {
           setProfile(null);
@@ -96,8 +87,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setLoading(true);
       },
       () => {
-        resolved = true;
-        window.clearTimeout(timeoutId);
         setUser(null);
         setProfile(null);
         setLoading(false);
@@ -105,7 +94,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     );
 
     return () => {
-      window.clearTimeout(timeoutId);
       unsubAuth();
     };
   }, []);

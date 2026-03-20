@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import {
   signInWithEmailAndPassword,
@@ -9,9 +9,13 @@ import {
 } from "firebase/auth";
 import { auth, db } from "../lib/firebase";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { useSession } from "../lib/session";
+
+const REMEMBER_ME_KEY = "trained_remember_me";
 
 export default function Login() {
   const router = useRouter();
+  const { user, loading: sessionLoading } = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -22,9 +26,31 @@ export default function Login() {
   const [confirmMessage, setConfirmMessage] = useState("");
   const [confirmType, setConfirmType] = useState<"success" | "error" | "warning">("success");
 
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(REMEMBER_ME_KEY);
+      if (stored === "0") setRememberMe(false);
+      if (stored === "1") setRememberMe(true);
+    } catch {
+      // Ignore storage read failures and keep default value.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (sessionLoading) return;
+    if (!user) return;
+    router.replace("/");
+  }, [sessionLoading, user, router]);
+
   const login = async () => {
     setLoading(true);
     try {
+      try {
+        window.localStorage.setItem(REMEMBER_ME_KEY, rememberMe ? "1" : "0");
+      } catch {
+        // Non-blocking: auth works even if localStorage is unavailable.
+      }
+
       // Persiste login sul browser corrente oppure solo per la sessione.
       await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
       await signInWithEmailAndPassword(auth, email, password);
@@ -46,6 +72,12 @@ export default function Login() {
 
     setLoading(true);
     try {
+      try {
+        window.localStorage.setItem(REMEMBER_ME_KEY, rememberMe ? "1" : "0");
+      } catch {
+        // Non-blocking: auth works even if localStorage is unavailable.
+      }
+
       await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
       const userCred = await createUserWithEmailAndPassword(auth, email, password);
       const uid = userCred.user.uid;
