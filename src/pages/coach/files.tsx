@@ -2,14 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { RoleGuard } from "../../components/RoleGuard";
 import { TopBar } from "../../components/TopBar";
 import { useSession } from "../../lib/session";
-import { db, storage } from "../../lib/firebase";
+import { db } from "../../lib/firebase";
+import { supabase } from "../../lib/supabase";
 import {
   AthleteOption,
   buildAthleteLabel,
   createSharedFileId,
   formatBytes,
   formatDateLabel,
-  sanitizeStorageSegment,
   sharedFileDoc,
   sharedFilesCollection,
   SharedFile,
@@ -17,7 +17,6 @@ import {
 import {
   collection,
   deleteDoc,
-  getDocs,
   onSnapshot,
   orderBy,
   query,
@@ -26,7 +25,6 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
 function fileLabel(file: SharedFile) {
   return file.fileName || file.originalName || "File";
@@ -108,15 +106,19 @@ function CoachFilesInner() {
     try {
       const fileId = createSharedFileId();
       const finalName = displayName.trim() || selectedUploadFile.name;
-      const storagePath = `shared-files/${fileId}/${finalName}`;
-      const storageRef = ref(storage, storagePath);
+      const storagePath = `${fileId}/${finalName}`;
 
-      // Upload directly to Firebase Storage
-      await uploadBytes(storageRef, selectedUploadFile, {
-        contentType: selectedUploadFile.type || "application/octet-stream",
-      });
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from("shared-files")
+        .upload(storagePath, selectedUploadFile, {
+          contentType: selectedUploadFile.type || "application/octet-stream",
+        });
 
-      const downloadUrl = await getDownloadURL(storageRef);
+      if (error) throw error;
+
+      // Get public URL
+      const downloadUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/shared-files/${storagePath}`;
 
       // Create Firestore metadata
       await setDoc(sharedFileDoc(fileId), {
@@ -168,7 +170,7 @@ function CoachFilesInner() {
     if (!confirmed) return;
 
     try {
-      await deleteObject(ref(storage, file.storagePath));
+      await supabase.storage.from("shared-files").remove([file.storagePath]);
     } catch {
       // If storage object is already gone, still remove metadata.
     }
