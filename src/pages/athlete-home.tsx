@@ -184,6 +184,20 @@ function AthleteHomeInner() {
             </div>
           )}
         </div>
+
+        <div className="card" style={{ marginTop: 20 }}>
+          <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+            <div>
+              <h2 style={{ margin: 0 }}>Visualizza File</h2>
+              <div className="small" style={{ marginTop: 8, opacity: 0.8 }}>
+                I file assegnati dal coach sono disponibili qui sotto le settimane di programma.
+              </div>
+            </div>
+            <Link href="/athlete/files" className="btn btnPrimary">
+              Apri file
+            </Link>
+          </div>
+        </div>
       </div>
     </>
   );

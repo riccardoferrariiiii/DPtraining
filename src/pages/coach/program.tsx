@@ -23,6 +23,10 @@ export default function CoachProgram() {
               <Link href="/coach/templates">
                 <button className="btn">Gestisci Settimane</button>
               </Link>
+
+              <Link href="/coach/files">
+                <button className="btn btnPrimary">Gestisci File</button>
+              </Link>
             </div>
           </div>
         </div>

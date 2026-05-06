@@ -15,9 +15,6 @@ export function RoleGuard({
   const { user, profile, loading } = useSession();
   const resolvedRole: Role = profile?.role === "coach" ? "coach" : "athlete";
 
-  if (loading) return <div className="container">Caricamento...</div>;
-  if (!user) return <div className="container">Devi fare login.</div>;
-
   const hasAccess =
     resolvedRole === role ||
     (resolvedRole === "coach" && role === "athlete"); // coach può entrare anche in atleta
@@ -36,6 +33,9 @@ export function RoleGuard({
       return;
     }
   }, [hasAccess, resolvedRole, router]);
+
+  if (loading) return <div className="container">Caricamento...</div>;
+  if (!user) return <div className="container">Devi fare login.</div>;
 
   if (!hasAccess) {
     return (
