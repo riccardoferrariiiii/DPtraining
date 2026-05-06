@@ -17,11 +17,11 @@ export default function CoachProgram() {
 
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               <Link href="/coach/athletes">
-                <button className="btn">Gestisci Atleti</button>
+                <button className="btn btnPrimary">Gestisci Atleti</button>
               </Link>
 
               <Link href="/coach/templates">
-                <button className="btn">Gestisci Settimane</button>
+                <button className="btn btnPrimary">Gestisci Settimane</button>
               </Link>
 
               <Link href="/coach/files">
