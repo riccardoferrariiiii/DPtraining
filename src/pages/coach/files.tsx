@@ -3,7 +3,6 @@ import { RoleGuard } from "../../components/RoleGuard";
 import { TopBar } from "../../components/TopBar";
 import { useSession } from "../../lib/session";
 import { db } from "../../lib/firebase";
-import { supabase } from "../../lib/supabase";
 import {
   AthleteOption,
   buildAthleteLabel,
@@ -109,20 +108,37 @@ function CoachFilesInner() {
       const storagePath = `${fileId}/${finalName}`;
       const BUCKET = process.env.NEXT_PUBLIC_SUPABASE_BUCKET || "shered-files";
 
-      // Upload to Supabase Storage
-      const { data, error } = await supabase.storage
-        .from(BUCKET)
-        .upload(storagePath, selectedUploadFile, {
-          contentType: selectedUploadFile.type || "application/octet-stream",
-        });
+      // Step 1: Get signed upload URL from server
+      const signedRes = await fetch("/api/signedUploadUrl", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileId, fileName: finalName }),
+      });
 
-      if (error) throw error;
+      if (!signedRes.ok) {
+        const errorData = await signedRes.json();
+        throw new Error(errorData.error || "Failed to get signed URL");
+      }
 
-      // Get public URL
-      const BUCKET_FOR_URL = process.env.NEXT_PUBLIC_SUPABASE_BUCKET || "shered-files";
-      const downloadUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET_FOR_URL}/${storagePath}`;
+      const { signedUrl } = await signedRes.json();
 
-      // Create Firestore metadata
+      // Step 2: Upload file using signed URL (PUT request)
+      const uploadRes = await fetch(signedUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": selectedUploadFile.type || "application/octet-stream",
+        },
+        body: selectedUploadFile,
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error(`Upload failed: ${uploadRes.status} ${uploadRes.statusText}`);
+      }
+
+      // Step 3: Create public download URL
+      const downloadUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${storagePath}`;
+
+      // Step 4: Save metadata to Firestore
       await setDoc(sharedFileDoc(fileId), {
         fileName: finalName,
         originalName: selectedUploadFile.name,
@@ -172,8 +188,14 @@ function CoachFilesInner() {
     if (!confirmed) return;
 
     try {
-      const BUCKET = process.env.NEXT_PUBLIC_SUPABASE_BUCKET || "shered-files";
-      await supabase.storage.from(BUCKET).remove([file.storagePath]);
+      // Delete from storage via server API
+      await fetch("/api/deleteFile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storagePath: file.storagePath }),
+      }).catch(() => {
+        // If storage deletion fails, still remove metadata.
+      });
     } catch {
       // If storage object is already gone, still remove metadata.
     }
