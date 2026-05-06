@@ -50,6 +50,8 @@ function CoachFilesInner() {
   const [assignDraft, setAssignDraft] = useState<string[]>([]);
   const [searchAthlete, setSearchAthlete] = useState("");
   const [message, setMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+  const [pendingDeleteFile, setPendingDeleteFile] = useState<SharedFile | null>(null);
+  const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
 
   useEffect(() => {
     const qAthletes = query(collection(db, "users"), where("role", "==", "athlete"));
@@ -105,40 +107,29 @@ function CoachFilesInner() {
     try {
       const fileId = createSharedFileId();
       const finalName = displayName.trim() || selectedUploadFile.name;
-      const BUCKET = process.env.NEXT_PUBLIC_SUPABASE_BUCKET || "shered-files";
+      const formData = new FormData();
+      formData.append("fileId", fileId);
+      formData.append("fileName", finalName);
+      formData.append("file", selectedUploadFile);
 
-      // Step 1: Get signed upload URL from server
-      const signedRes = await fetch("/api/signedUploadUrl", {
+      // Upload the file through the server so the browser never talks to Storage directly.
+      const uploadRes = await fetch("/api/uploadFile", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileId, fileName: finalName }),
-      });
-
-      if (!signedRes.ok) {
-        const errorData = await signedRes.json();
-        throw new Error(errorData.error || "Failed to get signed URL");
-      }
-
-      const { signedUrl, downloadUrl } = await signedRes.json();
-
-      // Step 2: Upload file to signed URL (bypasses RLS)
-      const uploadRes = await fetch(signedUrl, {
-        method: "PUT",
-        headers: {
-          "Content-Type": selectedUploadFile.type || "application/octet-stream",
-        },
-        body: selectedUploadFile,
+        body: formData,
       });
 
       if (!uploadRes.ok) {
-        throw new Error(`Upload failed: ${uploadRes.status}`);
+        const errorData = await uploadRes.json().catch(() => ({}));
+        throw new Error(errorData.error || `Upload failed: ${uploadRes.status}`);
       }
 
-      // Step 3: Save metadata to Firestore
+      const { storagePath, downloadUrl } = await uploadRes.json();
+
+      // Save metadata to Firestore after the server confirms the upload.
       await setDoc(sharedFileDoc(fileId), {
         fileName: finalName,
         originalName: selectedUploadFile.name,
-        storagePath: `${fileId}/${finalName}`,
+        storagePath,
         downloadUrl,
         mimeType: selectedUploadFile.type || "application/octet-stream",
         sizeBytes: selectedUploadFile.size,
@@ -180,15 +171,20 @@ function CoachFilesInner() {
   };
 
   const deleteFile = async (file: SharedFile) => {
-    const confirmed = window.confirm(`Eliminare ${fileLabel(file)}?`);
-    if (!confirmed) return;
+    setPendingDeleteFile(file);
+  };
+
+  const confirmDeleteFile = async () => {
+    if (!pendingDeleteFile) return;
+
+    setDeletingFileId(pendingDeleteFile.id);
 
     try {
       // Delete from storage via server API
       await fetch("/api/deleteFile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ storagePath: file.storagePath }),
+        body: JSON.stringify({ storagePath: pendingDeleteFile.storagePath }),
       }).catch(() => {
         // If storage deletion fails, still remove metadata.
       });
@@ -196,7 +192,9 @@ function CoachFilesInner() {
       // If storage object is already gone, still remove metadata.
     }
 
-    await deleteDoc(sharedFileDoc(file.id));
+    await deleteDoc(sharedFileDoc(pendingDeleteFile.id));
+    setPendingDeleteFile(null);
+    setDeletingFileId(null);
   };
 
   return (
@@ -295,10 +293,6 @@ function CoachFilesInner() {
                         <div className="small" style={{ marginBottom: 8 }}>
                           Originale: {file.originalName} | {formatBytes(file.sizeBytes)} | {formatDateLabel(file.createdAt)}
                         </div>
-                        <div className="small" style={{ marginBottom: 12, wordBreak: "break-word" }}>
-                          {file.mimeType}
-                        </div>
-
                         <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center" }}>
                           <a className="btn btnPrimary" href={file.downloadUrl} target="_blank" rel="noreferrer">
                             Visualizza file
@@ -367,23 +361,34 @@ function CoachFilesInner() {
         <div
           style={{
             position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.85)",
-            zIndex: 9999,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0, 0, 0, 1)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            zIndex: 9999,
             padding: 16,
           }}
           onClick={() => setActiveAssignFile(null)}
         >
           <div
             className="card"
-            style={{ width: "min(92vw, 760px)", maxHeight: "84vh", overflowY: "auto" }}
+            style={{
+              maxWidth: 500,
+              maxHeight: "80vh",
+              overflow: "auto",
+              padding: 24,
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 style={{ marginBottom: 8 }}>Assegna file</h2>
-            <div className="small" style={{ marginBottom: 14 }}>
+            <h2 style={{ marginBottom: 8 }}>Assegna file agli atleti</h2>
+            <div className="small" style={{ marginBottom: 14, opacity: 0.8 }}>
+              Seleziona gli atleti a cui vuoi assegnare questo file.
+            </div>
+            <div className="small" style={{ marginBottom: 14, fontWeight: 700 }}>
               {fileLabel(activeAssignFile)}
             </div>
 
@@ -395,7 +400,7 @@ function CoachFilesInner() {
               placeholder="Cerca atleta"
             />
 
-            <div className="stack" style={{ gap: 10 }}>
+            <div className="stack" style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
               {filteredAthletes.map((athlete) => {
                 const checked = assignDraft.includes(athlete.uid);
                 return (
@@ -404,39 +409,85 @@ function CoachFilesInner() {
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: 12,
-                      padding: 12,
-                      borderRadius: 12,
-                      border: "1px solid rgba(255,255,255,0.12)",
-                      background: "rgba(255,255,255,0.04)",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      padding: 10,
+                      backgroundColor: checked
+                        ? "rgba(76, 175, 80, 0.1)"
+                        : "rgba(245, 245, 247, 0.05)",
+                      borderRadius: 6,
                     }}
                   >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={(e) => {
-                        setAssignDraft((prev) =>
-                          e.target.checked
-                            ? Array.from(new Set([...prev, athlete.uid]))
-                            : prev.filter((uid) => uid !== athlete.uid)
-                        );
-                      }}
-                    />
-                    <div>
-                      <div style={{ fontWeight: 700 }}>{buildAthleteLabel(athlete)}</div>
-                      <div className="small">{athlete.uid}</div>
-                    </div>
+                    <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", flex: 1 }}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          setAssignDraft((prev) =>
+                            e.target.checked
+                              ? Array.from(new Set([...prev, athlete.uid]))
+                              : prev.filter((uid) => uid !== athlete.uid)
+                          );
+                        }}
+                      />
+                      <span>{buildAthleteLabel(athlete)}</span>
+                    </label>
                   </label>
                 );
               })}
             </div>
 
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 16 }}>
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
               <button className="btn" onClick={() => setActiveAssignFile(null)}>
                 Annulla
               </button>
               <button className="btn btnPrimary" onClick={saveAssignments}>
                 Salva assegnazione
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingDeleteFile && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0, 0, 0, 1)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10000,
+          }}
+          onClick={() => {
+            if (!deletingFileId) setPendingDeleteFile(null);
+          }}
+        >
+          <div
+            style={{
+              background: "linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.08))",
+              border: "1px solid rgba(255,255,255,0.16)",
+              borderRadius: 18,
+              padding: 24,
+              width: "min(92vw, 460px)",
+              boxShadow: "0 24px 64px rgba(0,0,0,0.45)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 12 }}>⚠️ Conferma eliminazione</div>
+            <div style={{ color: "rgba(245,245,247,0.75)", marginBottom: 20 }}>
+              Vuoi eliminare <strong>{fileLabel(pendingDeleteFile)}</strong>?
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button className="btn" onClick={() => setPendingDeleteFile(null)} disabled={!!deletingFileId}>
+                Annulla
+              </button>
+              <button className="btn btnDanger" onClick={confirmDeleteFile} disabled={!!deletingFileId}>
+                {deletingFileId ? "Eliminazione..." : "Elimina file"}
               </button>
             </div>
           </div>
