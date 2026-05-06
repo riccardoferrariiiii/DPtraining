@@ -13,7 +13,12 @@ import { db } from "./firebase";
 export type InAppNotificationInput = {
   title: string;
   message: string;
-  type: "result_submitted" | "coach_comment" | "week_assigned" | "subscription_expiring";
+  type:
+    | "result_submitted"
+    | "coach_comment"
+    | "week_assigned"
+    | "subscription_expiring"
+    | "file_assigned";
   link?: string;
 };
 

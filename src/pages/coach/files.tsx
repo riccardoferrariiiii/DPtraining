@@ -3,6 +3,7 @@ import { RoleGuard } from "../../components/RoleGuard";
 import { TopBar } from "../../components/TopBar";
 import { useSession } from "../../lib/session";
 import { db } from "../../lib/firebase";
+import { createUniqueInAppNotification } from "../../lib/inAppNotifications";
 import {
   AthleteOption,
   buildAthleteLabel,
@@ -166,6 +167,18 @@ function CoachFilesInner() {
       assignedAthleteUids: assignDraft,
       updatedAt: serverTimestamp(),
     });
+
+    const recipients = Array.from(new Set(assignDraft));
+    await Promise.all(
+      recipients.map((uid) =>
+        createUniqueInAppNotification(uid, `file-assigned-${activeAssignFile.id}`, {
+          type: "file_assigned",
+          title: "Nuovo file pubblicato",
+          message: `Il coach ti ha assegnato ${fileLabel(activeAssignFile)}.`,
+          link: "/athlete/files",
+        })
+      )
+    );
 
     setActiveAssignFile(null);
   };
