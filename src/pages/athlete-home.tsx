@@ -189,7 +189,7 @@ function AthleteHomeInner() {
           <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: 12 }}>
             <div>
               <h2 style={{ margin: 0 }}>Visualizza File</h2>
-              <div className="small" style={{ marginTop: 8, opacity: 0.8 }}>
+              <div style={{ opacity: 0.8, marginBottom: 16 }}>
                 Scarica i file e i materiali che il coach ha preparato per te.
               </div>
             </div>
