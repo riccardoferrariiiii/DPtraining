@@ -107,10 +107,11 @@ function CoachFilesInner() {
       const fileId = createSharedFileId();
       const finalName = displayName.trim() || selectedUploadFile.name;
       const storagePath = `${fileId}/${finalName}`;
+      const BUCKET = process.env.NEXT_PUBLIC_SUPABASE_BUCKET || "shered-files";
 
       // Upload to Supabase Storage
       const { data, error } = await supabase.storage
-        .from("shered-files")
+        .from(BUCKET)
         .upload(storagePath, selectedUploadFile, {
           contentType: selectedUploadFile.type || "application/octet-stream",
         });
@@ -118,7 +119,8 @@ function CoachFilesInner() {
       if (error) throw error;
 
       // Get public URL
-      const downloadUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/shered-files/${storagePath}`;
+      const BUCKET_FOR_URL = process.env.NEXT_PUBLIC_SUPABASE_BUCKET || "shered-files";
+      const downloadUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET_FOR_URL}/${storagePath}`;
 
       // Create Firestore metadata
       await setDoc(sharedFileDoc(fileId), {
@@ -170,7 +172,8 @@ function CoachFilesInner() {
     if (!confirmed) return;
 
     try {
-      await supabase.storage.from("shered-files").remove([file.storagePath]);
+      const BUCKET = process.env.NEXT_PUBLIC_SUPABASE_BUCKET || "shered-files";
+      await supabase.storage.from(BUCKET).remove([file.storagePath]);
     } catch {
       // If storage object is already gone, still remove metadata.
     }
