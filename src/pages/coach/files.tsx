@@ -26,7 +26,7 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import { deleteObject, ref } from "firebase/storage";
+import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
 function fileLabel(file: SharedFile) {
   return file.fileName || file.originalName || "File";
@@ -106,43 +106,31 @@ function CoachFilesInner() {
     setMessage(null);
 
     try {
-      // Get ID token for authentication
-      const idToken = await user.getIdToken();
-
-      // Read file as base64
-      const fileData = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result as string;
-          const base64 = result.split(",")[1];
-          resolve(base64);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(selectedUploadFile);
-      });
-
       const fileId = createSharedFileId();
       const finalName = displayName.trim() || selectedUploadFile.name;
+      const storagePath = `shared-files/${fileId}/${finalName}`;
+      const storageRef = ref(storage, storagePath);
 
-      // Upload via API route
-      const response = await fetch("/api/uploadFile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fileId,
-          fileName: finalName,
-          fileData,
-          mimeType: selectedUploadFile.type || "application/octet-stream",
-          sizeBytes: selectedUploadFile.size,
-          assignedAthleteUids: [],
-          idToken,
-        }),
+      // Upload directly to Firebase Storage
+      await uploadBytes(storageRef, selectedUploadFile, {
+        contentType: selectedUploadFile.type || "application/octet-stream",
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Upload failed");
-      }
+      const downloadUrl = await getDownloadURL(storageRef);
+
+      // Create Firestore metadata
+      await setDoc(sharedFileDoc(fileId), {
+        fileName: finalName,
+        originalName: selectedUploadFile.name,
+        storagePath,
+        downloadUrl,
+        mimeType: selectedUploadFile.type || "application/octet-stream",
+        sizeBytes: selectedUploadFile.size,
+        assignedAthleteUids: [],
+        uploadedByUid: user.uid,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
 
       setSelectedUploadFile(null);
       setDisplayName("");
