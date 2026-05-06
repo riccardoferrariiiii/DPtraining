@@ -190,7 +190,7 @@ function AthleteHomeInner() {
             <div>
               <h2 style={{ margin: 0 }}>Visualizza File</h2>
               <div className="small" style={{ marginTop: 8, opacity: 0.8 }}>
-                I file assegnati dal coach sono disponibili qui sotto le settimane di programma.
+                Scarica i file e i materiali che il coach ha preparato per te.
               </div>
             </div>
             <Link href="/athlete/files" className="btn btnPrimary">
