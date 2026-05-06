@@ -5,8 +5,6 @@ import { TopBar } from "../../components/TopBar";
 import { db } from "../../lib/firebase";
 import { useSession } from "../../lib/session";
 import {
-  formatBytes,
-  formatDateLabel,
   SharedFile,
   sharedFilesCollection,
 } from "../../lib/sharedFiles";
@@ -78,11 +76,8 @@ function AthleteFilesInner() {
                     borderColor: "rgba(255,255,255,0.12)",
                   }}
                 >
-                  <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>
+                  <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 14 }}>
                     {file.fileName || file.originalName || "File"}
-                  </div>
-                  <div className="small" style={{ marginBottom: 14 }}>
-                    Originale: {file.originalName} | {formatBytes(file.sizeBytes)} | {formatDateLabel(file.createdAt)}
                   </div>
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                     <a className="btn btnPrimary" href={file.downloadUrl} target="_blank" rel="noreferrer">
