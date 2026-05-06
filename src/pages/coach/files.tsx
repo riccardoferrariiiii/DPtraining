@@ -107,30 +107,38 @@ function CoachFilesInner() {
       const finalName = displayName.trim() || selectedUploadFile.name;
       const BUCKET = process.env.NEXT_PUBLIC_SUPABASE_BUCKET || "shered-files";
 
-      // Build FormData for server upload
-      const formData = new FormData();
-      formData.append("fileId", fileId);
-      formData.append("fileName", finalName);
-      formData.append("file", selectedUploadFile);
-
-      // Upload to server API (server uploads to Supabase)
-      const uploadRes = await fetch("/api/uploadFile", {
+      // Step 1: Get signed upload URL from server
+      const signedRes = await fetch("/api/signedUploadUrl", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileId, fileName: finalName }),
+      });
+
+      if (!signedRes.ok) {
+        const errorData = await signedRes.json();
+        throw new Error(errorData.error || "Failed to get signed URL");
+      }
+
+      const { signedUrl, downloadUrl } = await signedRes.json();
+
+      // Step 2: Upload file to signed URL (bypasses RLS)
+      const uploadRes = await fetch(signedUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": selectedUploadFile.type || "application/octet-stream",
+        },
+        body: selectedUploadFile,
       });
 
       if (!uploadRes.ok) {
-        const errorData = await uploadRes.json();
-        throw new Error(errorData.error || "Upload failed");
+        throw new Error(`Upload failed: ${uploadRes.status}`);
       }
 
-      const { storagePath, downloadUrl } = await uploadRes.json();
-
-      // Save metadata to Firestore
+      // Step 3: Save metadata to Firestore
       await setDoc(sharedFileDoc(fileId), {
         fileName: finalName,
         originalName: selectedUploadFile.name,
-        storagePath,
+        storagePath: `${fileId}/${finalName}`,
         downloadUrl,
         mimeType: selectedUploadFile.type || "application/octet-stream",
         sizeBytes: selectedUploadFile.size,

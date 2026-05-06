@@ -24,7 +24,7 @@ export default async function handler(
     const bucket = process.env.NEXT_PUBLIC_SUPABASE_BUCKET || "shered-files";
     const storagePath = `${fileId}/${fileName}`;
 
-    // Generate signed URL (expires in 3600 seconds = 1 hour)
+    // Generate signed URL for PUT upload (1 hour expiry)
     const { data, error } = await supabase.storage
       .from(bucket)
       .createSignedUploadUrl(storagePath, 3600);
@@ -34,10 +34,13 @@ export default async function handler(
       return res.status(400).json({ error: error.message });
     }
 
+    const downloadUrl = `${supabaseUrl}/storage/v1/object/public/${bucket}/${storagePath}`;
+
     return res.status(200).json({
       signedUrl: data.signedUrl,
       token: data.token,
       storagePath,
+      downloadUrl,
     });
   } catch (error: any) {
     console.error("API error:", error);
