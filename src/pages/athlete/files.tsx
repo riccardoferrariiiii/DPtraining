@@ -81,15 +81,12 @@ function AthleteFilesInner() {
                   <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>
                     {file.fileName || file.originalName || "File"}
                   </div>
-                  <div className="small" style={{ marginBottom: 8 }}>
+                  <div className="small" style={{ marginBottom: 14 }}>
                     Originale: {file.originalName} | {formatBytes(file.sizeBytes)} | {formatDateLabel(file.createdAt)}
-                  </div>
-                  <div className="small" style={{ marginBottom: 14, wordBreak: "break-word" }}>
-                    {file.mimeType}
                   </div>
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                     <a className="btn btnPrimary" href={file.downloadUrl} target="_blank" rel="noreferrer">
-                      Visualizza file
+                      Scarica
                     </a>
                   </div>
                 </div>
