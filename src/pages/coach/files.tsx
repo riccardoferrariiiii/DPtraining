@@ -105,40 +105,28 @@ function CoachFilesInner() {
     try {
       const fileId = createSharedFileId();
       const finalName = displayName.trim() || selectedUploadFile.name;
-      const storagePath = `${fileId}/${finalName}`;
       const BUCKET = process.env.NEXT_PUBLIC_SUPABASE_BUCKET || "shered-files";
 
-      // Step 1: Get signed upload URL from server
-      const signedRes = await fetch("/api/signedUploadUrl", {
+      // Build FormData for server upload
+      const formData = new FormData();
+      formData.append("fileId", fileId);
+      formData.append("fileName", finalName);
+      formData.append("file", selectedUploadFile);
+
+      // Upload to server API (server uploads to Supabase)
+      const uploadRes = await fetch("/api/uploadFile", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileId, fileName: finalName }),
-      });
-
-      if (!signedRes.ok) {
-        const errorData = await signedRes.json();
-        throw new Error(errorData.error || "Failed to get signed URL");
-      }
-
-      const { signedUrl } = await signedRes.json();
-
-      // Step 2: Upload file using signed URL (PUT request)
-      const uploadRes = await fetch(signedUrl, {
-        method: "PUT",
-        headers: {
-          "Content-Type": selectedUploadFile.type || "application/octet-stream",
-        },
-        body: selectedUploadFile,
+        body: formData,
       });
 
       if (!uploadRes.ok) {
-        throw new Error(`Upload failed: ${uploadRes.status} ${uploadRes.statusText}`);
+        const errorData = await uploadRes.json();
+        throw new Error(errorData.error || "Upload failed");
       }
 
-      // Step 3: Create public download URL
-      const downloadUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${storagePath}`;
+      const { storagePath, downloadUrl } = await uploadRes.json();
 
-      // Step 4: Save metadata to Firestore
+      // Save metadata to Firestore
       await setDoc(sharedFileDoc(fileId), {
         fileName: finalName,
         originalName: selectedUploadFile.name,

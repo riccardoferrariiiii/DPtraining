@@ -1,0 +1,76 @@
+import { createClient } from "@supabase/supabase-js";
+import type { NextApiRequest, NextApiResponse } from "next";
+import { IncomingForm } from "formidable";
+import fs from "fs";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+  },
+});
+
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  try {
+    const form = new IncomingForm();
+
+    const [fields, files] = await form.parse(req);
+
+    const fileId = fields.fileId?.[0];
+    const fileName = fields.fileName?.[0];
+    const file = files.file?.[0];
+
+    if (!fileId || !fileName || !file) {
+      return res
+        .status(400)
+        .json({ error: "Missing fileId, fileName, or file" });
+    }
+
+    const bucket = process.env.NEXT_PUBLIC_SUPABASE_BUCKET || "shered-files";
+    const storagePath = `${fileId}/${fileName}`;
+
+    // Read file from disk
+    const fileContent = fs.readFileSync(file.filepath);
+
+    // Upload directly via service role
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .upload(storagePath, fileContent, {
+        contentType: file.mimetype || "application/octet-stream",
+        upsert: false,
+      });
+
+    if (error) {
+      console.error("Upload error:", error);
+      return res.status(400).json({ error: error.message });
+    }
+
+    // Generate public URL
+    const downloadUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${bucket}/${storagePath}`;
+
+    return res.status(200).json({
+      success: true,
+      storagePath,
+      downloadUrl,
+    });
+  } catch (error: any) {
+    console.error("API error:", error);
+    return res.status(500).json({ error: error.message });
+  }
+}
