@@ -26,7 +26,7 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { deleteObject, ref } from "firebase/storage";
 
 function fileLabel(file: SharedFile) {
   return file.fileName || file.originalName || "File";
@@ -106,30 +106,43 @@ function CoachFilesInner() {
     setMessage(null);
 
     try {
-      const fileId = createSharedFileId();
-      const safeName = sanitizeStorageSegment(selectedUploadFile.name);
-      const storagePath = `shared-files/${fileId}/${safeName}`;
-      const storageRef = ref(storage, storagePath);
+      // Get ID token for authentication
+      const idToken = await user.getIdToken();
 
-      await uploadBytes(storageRef, selectedUploadFile, {
-        contentType: selectedUploadFile.type || "application/octet-stream",
+      // Read file as base64
+      const fileData = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          const base64 = result.split(",")[1];
+          resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(selectedUploadFile);
       });
 
-      const downloadUrl = await getDownloadURL(storageRef);
+      const fileId = createSharedFileId();
       const finalName = displayName.trim() || selectedUploadFile.name;
 
-      await setDoc(sharedFileDoc(fileId), {
-        fileName: finalName,
-        originalName: selectedUploadFile.name,
-        storagePath,
-        downloadUrl,
-        mimeType: selectedUploadFile.type || "application/octet-stream",
-        sizeBytes: selectedUploadFile.size,
-        assignedAthleteUids: [],
-        uploadedByUid: user.uid,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+      // Upload via API route
+      const response = await fetch("/api/uploadFile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileId,
+          fileName: finalName,
+          fileData,
+          mimeType: selectedUploadFile.type || "application/octet-stream",
+          sizeBytes: selectedUploadFile.size,
+          assignedAthleteUids: [],
+          idToken,
+        }),
       });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Upload failed");
+      }
 
       setSelectedUploadFile(null);
       setDisplayName("");
