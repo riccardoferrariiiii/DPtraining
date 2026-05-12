@@ -92,13 +92,43 @@ async function deleteAthlete(uid) {
     console.log('Deleted', userRef.path);
   }
 
-  // delete auth user
-  try {
-    await auth.deleteUser(uid);
-    console.log('Deleted auth user', uid);
-  } catch (err) {
-    console.warn('Auth deletion error (maybe user missing):', err.message || err);
+  const email =
+    userDoc.exists && typeof userDoc.get('email') === 'string' && userDoc.get('email').includes('@')
+      ? String(userDoc.get('email')).trim()
+      : undefined;
+
+  async function ensureAuthRemoved() {
+    try {
+      await auth.deleteUser(uid);
+    } catch (err) {
+      const code = err?.errorInfo?.code || err?.code;
+      if (code === "auth/user-not-found") {
+        // ok
+      } else if (email) {
+        try {
+          const u = await auth.getUserByEmail(email);
+          if (u.uid === uid) await auth.deleteUser(uid);
+        } catch (err2) {
+          const c2 = err2?.errorInfo?.code || err2?.code;
+          if (c2 !== "auth/user-not-found") throw err;
+        }
+      } else {
+        throw err;
+      }
+    }
+    try {
+      await auth.getUser(uid);
+      throw new Error("Auth user still exists after delete attempts");
+    } catch (check) {
+      const c = check?.errorInfo?.code || check?.code;
+      if (c === "auth/user-not-found") return;
+      if (check && check.message === "Auth user still exists after delete attempts") throw check;
+      throw check;
+    }
   }
+
+  await ensureAuthRemoved();
+  console.log('Deleted auth user', uid);
 
   console.log('Finished deleting', uid);
 }

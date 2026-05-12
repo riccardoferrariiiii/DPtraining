@@ -8,7 +8,8 @@ import {
   browserSessionPersistence,
 } from "firebase/auth";
 import { auth, db } from "../lib/firebase";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { signOut } from "firebase/auth";
 import { useSession } from "../lib/session";
 
 const REMEMBER_ME_KEY = "trained_remember_me";
@@ -22,9 +23,16 @@ function translateFirebaseError(error: any): string {
   if (code === "auth/invalid-email") return "Email non valida. Inserisci un'email con il formato corretto (es. nome@email.com)";
   if (code === "auth/user-not-found") return "Utente non trovato. Controlla email e riprova.";
   if (code === "auth/wrong-password") return "Password errata. Riprova.";
-  if (code === "auth/user-disabled") return "Questo account è stato disabilitato.";
+  if (code === "auth/user-disabled") {
+    return "Questo account è stato disabilitato. Contatta il coach.";
+  }
   if (code === "auth/too-many-login-attempts") return "Troppi tentativi di accesso. Riprova più tardi.";
-  if (code === "auth/email-already-in-use") return "Questa email è già registrata. Usa un'altra email o accedi.";
+  if (code === "auth/email-already-in-use") {
+    return "Questa email risulta ancora registrata. Se il coach ti ha rimosso dal programma, chiedi che l'eliminazione sia completata in Firebase Authentication; altrimenti prova 'Password dimenticata' o accedi.";
+  }
+  if (code === "auth/invalid-credential") {
+    return "Email o password non corretti. Controlla i dati e riprova.";
+  }
   if (code === "auth/weak-password") return "Password troppo corta. Usa almeno 6 caratteri.";
   if (code === "auth/invalid-password") return "Password non valida. Usa almeno 6 caratteri.";
   if (code === "auth/missing-email") return "Email obbligatoria.";
@@ -59,6 +67,21 @@ export default function Login() {
   }, []);
 
   useEffect(() => {
+    try {
+      const raw = window.sessionStorage?.getItem("trained_login_notice");
+      if (!raw) return;
+      window.sessionStorage.removeItem("trained_login_notice");
+      const o = JSON.parse(raw) as { message?: string };
+      if (o?.message) {
+        setConfirmMessage(o.message);
+        setConfirmType("error");
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
     if (sessionLoading) return;
     if (!user) return;
     router.replace("/");
@@ -75,7 +98,23 @@ export default function Login() {
 
       // Persiste login sul browser corrente oppure solo per la sessione.
       await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
-      await signInWithEmailAndPassword(auth, email, password);
+      const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+      const profileSnap = await getDoc(doc(db, "users", cred.user.uid));
+      if (!profileSnap.exists()) {
+        await signOut(auth);
+        setConfirmMessage(
+          "Il tuo account non è più attivo o è stato rimosso dal programma. Contatta il coach."
+        );
+        setConfirmType("error");
+        return;
+      }
+      const pdata = profileSnap.data() as { disabled?: boolean };
+      if (pdata?.disabled === true) {
+        await signOut(auth);
+        setConfirmMessage("Il tuo account è stato disattivato. Contatta il coach.");
+        setConfirmType("error");
+        return;
+      }
       router.push("/");
     } catch (e: any) {
       setConfirmMessage(translateFirebaseError(e));
@@ -101,12 +140,13 @@ export default function Login() {
       }
 
       await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
-      const userCred = await createUserWithEmailAndPassword(auth, email, password);
+      const trimmedEmail = email.trim();
+      const userCred = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
       const uid = userCred.user.uid;
 
       // Salva i dati nel database
       await setDoc(doc(db, "users", uid), {
-        email,
+        email: trimmedEmail,
         firstName,
         lastName,
         role: "athlete",

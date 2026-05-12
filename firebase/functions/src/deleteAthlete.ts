@@ -7,6 +7,52 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
+function isAuthUserNotFound(err: unknown): boolean {
+  const code = (err as { errorInfo?: { code?: string }; code?: string })?.errorInfo?.code
+    || (err as { code?: string })?.code;
+  return code === "auth/user-not-found";
+}
+
+/** Elimina l'utente da Firebase Auth e verifica che non esista più; altrimenti errore (email altrimenti resta “già in uso”). */
+async function ensureAuthUserRemoved(uid: string, email?: string) {
+  try {
+    await admin.auth().deleteUser(uid);
+  } catch (err) {
+    if (isAuthUserNotFound(err)) {
+      // ok, già assente
+    } else if (email) {
+      try {
+        const u = await admin.auth().getUserByEmail(email);
+        if (u.uid === uid) {
+          await admin.auth().deleteUser(uid);
+        }
+      } catch (err2) {
+        if (!isAuthUserNotFound(err2)) {
+          throw err;
+        }
+      }
+    } else {
+      throw err;
+    }
+  }
+
+  try {
+    await admin.auth().getUser(uid);
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      "L'accesso Firebase non è stato eliminato: l'email resterebbe bloccata. Riprova o elimina l'utente dalla console Firebase (Authentication)."
+    );
+  } catch (check: unknown) {
+    if (check instanceof functions.https.HttpsError) {
+      throw check;
+    }
+    if (isAuthUserNotFound(check)) {
+      return;
+    }
+    throw check;
+  }
+}
+
 async function deleteCollectionRecursiveByRef(collRef: FirebaseFirestore.CollectionReference) {
   const snap = await collRef.get();
   for (const doc of snap.docs) {
@@ -36,6 +82,11 @@ export const deleteAthlete = functions.https.onCall(async (data, context) => {
   if (!targetUid || typeof targetUid !== "string") {
     throw new functions.https.HttpsError("invalid-argument", "Missing athlete uid");
   }
+
+  const targetUserSnap = await db.collection("users").doc(targetUid).get();
+  const rawEmail = targetUserSnap.data()?.email;
+  const athleteEmail =
+    typeof rawEmail === "string" && rawEmail.includes("@") ? rawEmail.trim() : undefined;
 
   try {
     // 0) Legacy athletePrograms/{uid} (subcollections can exist without a parent doc)
@@ -99,13 +150,8 @@ export const deleteAthlete = functions.https.onCall(async (data, context) => {
       await userDocRef.delete();
     }
 
-    // 8) Delete Firebase Auth user
-    try {
-      await admin.auth().deleteUser(targetUid);
-    } catch (err) {
-      // If deletion from Auth fails (user not found), ignore
-      console.warn("Auth deletion error or user not found:", err);
-    }
+    // 8) Firebase Auth: obbligatorio e verificato (altrimenti l'email resta "già in uso" alla nuova registrazione)
+    await ensureAuthUserRemoved(targetUid, athleteEmail);
 
     return { success: true };
   } catch (error) {

@@ -116,6 +116,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           setProfile(null);
           setLoading(false);
           try {
+            if (typeof window !== "undefined") {
+              window.sessionStorage.setItem(
+                "trained_login_notice",
+                JSON.stringify({
+                  message:
+                    "Il tuo account non è più attivo o è stato rimosso dal programma. Contatta il coach.",
+                })
+              );
+            }
+          } catch {
+            // ignore storage
+          }
+          try {
             void signOut(auth);
           } catch {
             // Ignora errori nel signOut qui; l'onAuthStateChanged gestirà lo stato.
@@ -130,6 +143,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if ((data as any)?.disabled) {
           setProfile(data);
           setLoading(false);
+          try {
+            if (typeof window !== "undefined") {
+              window.sessionStorage.setItem(
+                "trained_login_notice",
+                JSON.stringify({
+                  message: "Il tuo account è stato disattivato. Contatta il coach.",
+                })
+              );
+            }
+          } catch {
+            // ignore storage
+          }
           try {
             void signOut(auth);
           } catch {
