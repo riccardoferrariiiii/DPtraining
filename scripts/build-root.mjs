@@ -36,6 +36,10 @@ async function main() {
     await rm(rootNextDir, { recursive: true, force: true });
   }
 
+  // Ensure root dependencies (including @opentelemetry/api) are installed in the Vercel root
+  await runNpm(["ci"]);
+
+  // Install and build the web app
   await runNpm(["--prefix", "web", "ci"]);
   await runNpm(["--prefix", "web", "run", "build"]);
 
