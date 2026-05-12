@@ -2,10 +2,10 @@
   "name": "dptraining-web",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "export": "next export"
+    "dev": "cd web && next dev",
+    "build": "npm --prefix web ci && npm --prefix web run build",
+    "start": "cd web && next start",
+    "export": "cd web && next export"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.3",
