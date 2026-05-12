@@ -1,11 +1,14 @@
 import { rm, access, cp } from "node:fs/promises";
+import { mkdirSync } from "node:fs";
 import { constants } from "node:fs";
 import { resolve, relative, sep } from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, execFile } from "node:child_process";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
 
 const rootDir = resolve(process.cwd());
-const webDir = resolve(rootDir, "web");
-const webNextDir = resolve(webDir, ".next");
+const webNextDir = resolve(rootDir, "web", ".next");
 const rootNextDir = resolve(rootDir, ".next");
 
 async function pathExists(path) {
@@ -52,6 +55,48 @@ function skipDevOnly(src) {
   return rel !== "dev" && !rel.startsWith(`dev${sep}`);
 }
 
+/**
+ * Copia web/.next → root/.next includendo `.next/node_modules` (tracing Next).
+ * NON usare fs.cp({ dereference: true }): su Linux può lanciare EISDIR su alcuni symlink/cartelle.
+ * Su Vercel (Linux) usiamo rsync --copy-links o cp -aL.
+ */
+async function copyNextToRoot() {
+  await rm(rootNextDir, { recursive: true, force: true });
+  mkdirSync(rootNextDir, { recursive: true });
+
+  const isWin = process.platform === "win32";
+
+  if (!isWin) {
+    try {
+      await execFileAsync(
+        "rsync",
+        ["-a", "--copy-links", "--exclude=dev/", `${webNextDir}/`, `${rootNextDir}/`],
+        { cwd: rootDir, maxBuffer: 64 * 1024 * 1024 },
+      );
+      return;
+    } catch (e) {
+      console.warn("[build-root] rsync failed, trying cp -aL:", e?.message || e);
+    }
+
+    try {
+      await execFileAsync("cp", ["-aL", `${webNextDir}/.`, `${rootNextDir}/`], {
+        cwd: rootDir,
+        maxBuffer: 64 * 1024 * 1024,
+      });
+      await rm(resolve(rootNextDir, "dev"), { recursive: true, force: true }).catch(() => {});
+      return;
+    } catch (e2) {
+      console.warn("[build-root] cp -aL failed, falling back to Node fs.cp:", e2?.message || e2);
+    }
+  }
+
+  await cp(webNextDir, rootNextDir, {
+    recursive: true,
+    dereference: false,
+    filter: (src) => skipDevOnly(src),
+  });
+}
+
 async function main() {
   if (await pathExists(rootNextDir)) {
     await rm(rootNextDir, { recursive: true, force: true });
@@ -61,14 +106,7 @@ async function main() {
   await runNpm(["--prefix", "web", "ci"]);
   await runNpm(["--prefix", "web", "run", "build"]);
 
-  // Copia l'intera .next incluso `.next/node_modules` (file tracing di Next / Turbopack).
-  // Escludere `node_modules` qui causava ENOENT su Vercel (es. @supabase/..., @opentelemetry/...).
-  // `dereference: true` materializza i symlink verso web/node_modules.
-  await cp(webNextDir, rootNextDir, {
-    recursive: true,
-    dereference: true,
-    filter: (src) => skipDevOnly(src),
-  });
+  await copyNextToRoot();
 }
 
 main().catch((error) => {
