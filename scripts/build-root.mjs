@@ -1,4 +1,4 @@
-import { rm, cp, access } from "node:fs/promises";
+import { rm, access, readdir, cp } from "node:fs/promises";
 import { constants } from "node:fs";
 import { resolve } from "node:path";
 import { execFile } from "node:child_process";
@@ -14,7 +14,7 @@ async function pathExists(path) {
   try {
     await access(path, constants.F_OK);
     return true;
-  } catch {
+  } catch (error) {
     return false;
   }
 }
@@ -32,18 +32,24 @@ async function runNpm(args) {
 }
 
 async function main() {
-  await runNpm(["--prefix", "web", "ci"]);
-  await runNpm(["--prefix", "web", "run", "build"]);
-
   if (await pathExists(rootNextDir)) {
     await rm(rootNextDir, { recursive: true, force: true });
   }
 
-  await cp(webNextDir, rootNextDir, {
-    recursive: true,
-    dereference: true,
-    filter: (source) => !source.includes(`${resolve(webNextDir, "dev")}`),
-  });
+  await runNpm(["--prefix", "web", "ci"]);
+  await runNpm(["--prefix", "web", "run", "build"]);
+
+  const entries = await readdir(webNextDir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.name === "dev" || entry.name === "node_modules") {
+      continue;
+    }
+
+    await cp(resolve(webNextDir, entry.name), resolve(rootNextDir, entry.name), {
+      recursive: true,
+      dereference: false,
+    });
+  }
 }
 
 main().catch((error) => {
