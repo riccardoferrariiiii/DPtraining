@@ -28,7 +28,7 @@ function translateFirebaseError(error: any): string {
   }
   if (code === "auth/too-many-login-attempts") return "Troppi tentativi di accesso. Riprova più tardi.";
   if (code === "auth/email-already-in-use") {
-    return "Questa email è già in uso. Se hai già un account, accedi; altrimenti prova 'Password dimenticata'.";
+    return "Questa email è già in uso. Se hai già un account, accedi; altrimenti prova 'Password dimenticata'. Se il coach ti ha appena rimosso e vedi ancora questo messaggio, l'eliminazione dal server non è andata a buon fine: contatta il coach.";
   }
   if (code === "auth/invalid-credential") {
     return "Email o password non corretti. Controlla i dati e riprova.";

@@ -22,7 +22,7 @@ async function ensureAuthUserRemoved(uid: string, email?: string) {
       // ok, già assente
     } else if (email) {
       try {
-        const u = await admin.auth().getUserByEmail(email);
+        const u = await admin.auth().getUserByEmail(email.trim().toLowerCase());
         if (u.uid === uid) {
           await admin.auth().deleteUser(uid);
         }
@@ -89,6 +89,9 @@ export const deleteAthlete = functions.https.onCall(async (data, context) => {
     typeof rawEmail === "string" && rawEmail.includes("@") ? rawEmail.trim() : undefined;
 
   try {
+    // Prima Firebase Auth: libera subito l'email (anche se Firestore va in timeout dopo).
+    await ensureAuthUserRemoved(targetUid, athleteEmail);
+
     // 0) Legacy athletePrograms/{uid} (subcollections can exist without a parent doc)
     const athleteProgramsDoc = db.collection("athletePrograms").doc(targetUid);
     const athleteProgramSubcols = await athleteProgramsDoc.listCollections();
@@ -149,9 +152,6 @@ export const deleteAthlete = functions.https.onCall(async (data, context) => {
       }
       await userDocRef.delete();
     }
-
-    // 8) Firebase Auth: obbligatorio e verificato (altrimenti l'email resta "già in uso" alla nuova registrazione)
-    await ensureAuthUserRemoved(targetUid, athleteEmail);
 
     return { success: true };
   } catch (error) {

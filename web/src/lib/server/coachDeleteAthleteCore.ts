@@ -17,8 +17,9 @@ async function ensureAuthUserRemoved(
     if (isAuthUserNotFound(err)) {
       // ok
     } else if (email) {
+      const normalized = email.trim().toLowerCase();
       try {
-        const u = await auth.getUserByEmail(email);
+        const u = await auth.getUserByEmail(normalized);
         if (u.uid === uid) {
           await auth.deleteUser(uid);
         }
@@ -38,7 +39,7 @@ async function ensureAuthUserRemoved(
   } catch (check: unknown) {
     if ((check as Error)?.message === "AUTH_USER_STILL_EXISTS") {
       throw new Error(
-        "L'utente Firebase Authentication non è stato eliminato: l'email resterebbe bloccata. Controlla i permessi del service account."
+        "L'utente Firebase Authentication non è stato eliminato: l'email resterebbe bloccata. Controlla le credenziali Admin su Vercel (stesso progetto Firebase dell'app)."
       );
     }
     if (isAuthUserNotFound(check)) {
@@ -62,8 +63,8 @@ async function deleteCollectionRecursiveByRef(
 }
 
 /**
- * Stessa logica della Cloud Function deleteAthlete: Firestore + Auth.
- * Usa l'SDK Admin già inizializzato.
+ * Elimina prima Firebase Auth (libera subito l'email), poi tutto Firestore.
+ * Così anche se il passaggio Firestore va in timeout, l'atleta può rifarsi l'account.
  */
 export async function coachDeleteAthleteCore(
   db: admin.firestore.Firestore,
@@ -74,6 +75,8 @@ export async function coachDeleteAthleteCore(
   const rawEmail = targetUserSnap.data()?.email;
   const athleteEmail =
     typeof rawEmail === "string" && rawEmail.includes("@") ? rawEmail.trim() : undefined;
+
+  await ensureAuthUserRemoved(auth, targetUid, athleteEmail);
 
   const athleteProgramsDoc = db.collection("athletePrograms").doc(targetUid);
   const athleteProgramSubcols = await athleteProgramsDoc.listCollections();
@@ -125,6 +128,4 @@ export async function coachDeleteAthleteCore(
     }
     await userDocRef.delete();
   }
-
-  await ensureAuthUserRemoved(auth, targetUid, athleteEmail);
 }

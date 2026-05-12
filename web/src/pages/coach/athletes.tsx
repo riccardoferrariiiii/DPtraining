@@ -431,7 +431,14 @@ function CoachAthletesInner() {
 
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
-        setConfirmMessage(data.error || `Errore durante l'eliminazione (${res.status})`);
+        let msg = typeof data.error === "string" ? data.error : `Errore durante l'eliminazione (${res.status})`;
+        if (res.status === 503) {
+          msg =
+            "Eliminazione incompleta: mancano le credenziali Firebase Admin su Vercel. " +
+            "Aggiungi la variabile FIREBASE_SERVICE_ACCOUNT_JSON (o FIREBASE_SERVICE_ACCOUNT_BASE64) nelle Environment Variables del progetto Vercel, poi Redeploy. " +
+            (typeof data.error === "string" ? data.error : "");
+        }
+        setConfirmMessage(msg.trim());
         setConfirmType("error");
         return;
       }
