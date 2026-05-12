@@ -412,16 +412,46 @@ function CoachAthletesInner() {
     try {
       setDeletingUid(athlete.uid);
 
+      // Delete all results within weeks
       const weeksRef = collection(db, "users", athlete.uid, "weeks");
       const weeksSnap = await getDocs(weeksRef);
-      await Promise.all(weeksSnap.docs.map((weekDoc) => deleteDoc(weekDoc.ref)));
+      for (const weekDoc of weeksSnap.docs) {
+        const resultsRef = collection(db, "users", athlete.uid, "weeks", weekDoc.id, "results");
+        const resultsSnap = await getDocs(resultsRef);
+        await Promise.all(resultsSnap.docs.map((resultDoc) => deleteDoc(resultDoc.ref)));
+        // Delete the week document after deleting its results
+        await deleteDoc(weekDoc.ref);
+      }
 
+      // Delete all PRs
+      const prsRef = collection(db, "users", athlete.uid, "prs");
+      const prsSnap = await getDocs(prsRef);
+      await Promise.all(prsSnap.docs.map((prDoc) => deleteDoc(prDoc.ref)));
+
+      // Delete all notifications
+      const notificationsRef = collection(db, "users", athlete.uid, "notifications");
+      const notificationsSnap = await getDocs(notificationsRef);
+      await Promise.all(notificationsSnap.docs.map((notifDoc) => deleteDoc(notifDoc.ref)));
+
+      // Delete all entries in results collection
+      const entriesRef = collection(db, "results", athlete.uid, "entries");
+      const entriesSnap = await getDocs(entriesRef);
+      await Promise.all(entriesSnap.docs.map((entryDoc) => deleteDoc(entryDoc.ref)));
+
+      // Delete the results/{athleteUid} document if it exists
+      try {
+        await deleteDoc(doc(db, "results", athlete.uid));
+      } catch {
+        // Ignore if document doesn't exist
+      }
+
+      // Finally, delete the user document
       await deleteDoc(doc(db, "users", athlete.uid));
 
       setConfirmMessage("Atleta eliminato ✅");
       setConfirmType("success");
     } catch (error) {
-      setConfirmMessage("Errore durante l'eliminazione dell'atleta.");
+      setConfirmMessage(`Errore durante l'eliminazione dell'atleta: ${error?.message || String(error)}`);
       setConfirmType("error");
     } finally {
       setDeletingUid("");
