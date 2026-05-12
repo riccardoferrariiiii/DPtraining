@@ -436,14 +436,20 @@ function CoachAthletesInner() {
       } catch {
         // risposta non JSON (es. HTML errore edge)
       }
+      const looksLikeHtml =
+        /^\s*<!DOCTYPE\s+html/i.test(text) || /<title>\s*500:\s*Internal Server Error/i.test(text);
       if (!res.ok) {
         const fromBody =
           typeof data.error === "string" && data.error.trim() ? data.error.trim() : "";
-        const fromRaw = text.trim().slice(0, 800);
+        const fromRaw = looksLikeHtml
+          ? ""
+          : text.trim().slice(0, 800);
         let msg =
           fromBody ||
           fromRaw ||
-          `Errore durante l'eliminazione (${res.status})`;
+          (looksLikeHtml
+            ? `Errore interno del server (${res.status}). Apri Vercel → progetto → Logs → filtra per coachDeleteAthlete per il dettaglio.`
+            : `Errore durante l'eliminazione (${res.status})`);
         if (typeof data.code === "string" && data.code) {
           msg = `${msg} (${data.code})`;
         }
