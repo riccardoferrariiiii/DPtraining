@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { RoleGuard } from "../../components/RoleGuard";
 import { TopBar } from "../../components/TopBar";
-import { db, functions } from "../../lib/firebase";
+import { db, auth } from "../../lib/firebase";
 import { createInAppNotification } from "../../lib/inAppNotifications";
 import { isSubscriptionExpired } from "../../lib/session";
 import {
@@ -17,7 +17,6 @@ import {
   where,
   addDoc,
 } from "firebase/firestore";
-import { httpsCallable } from "firebase/functions";
 
 type Athlete = {
   uid: string;
@@ -413,14 +412,35 @@ function CoachAthletesInner() {
     try {
       setDeletingUid(athlete.uid);
 
-      const fn = httpsCallable(functions, "deleteAthlete");
-      await fn({ uid: athlete.uid });
+      const current = auth.currentUser;
+      if (!current) {
+        setConfirmMessage("Sessione scaduta. Effettua di nuovo il login.");
+        setConfirmType("error");
+        return;
+      }
+
+      const idToken = await current.getIdToken();
+      const res = await fetch("/api/coachDeleteAthlete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ uid: athlete.uid }),
+      });
+
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setConfirmMessage(data.error || `Errore durante l'eliminazione (${res.status})`);
+        setConfirmType("error");
+        return;
+      }
 
       setConfirmMessage("Atleta eliminato definitivamente ✅");
       setConfirmType("success");
     } catch (error) {
-      console.error("deleteAthlete callable error:", error);
-      const message = error?.message || String(error);
+      console.error("deleteAthlete API error:", error);
+      const message = error instanceof Error ? error.message : String(error);
       setConfirmMessage(`Errore durante l'eliminazione dell'atleta: ${message}`);
       setConfirmType("error");
     } finally {
