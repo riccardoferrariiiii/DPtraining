@@ -39,6 +39,27 @@ async function deleteAthlete(uid) {
   const userRef = db.collection('users').doc(uid);
   const userDoc = await userRef.get();
 
+  // Legacy athletePrograms/{uid}
+  const apRef = db.collection('athletePrograms').doc(uid);
+  const apSubcols = await apRef.listCollections();
+  for (const sc of apSubcols) {
+    await deleteCollectionRecursive(sc);
+  }
+
+  // sharedFiles: drop uid from assignedAthleteUids
+  const sharedSnap = await db
+    .collection('sharedFiles')
+    .where('assignedAthleteUids', 'array-contains', uid)
+    .get();
+  for (const fileDoc of sharedSnap.docs) {
+    const assigned = fileDoc.get('assignedAthleteUids') || [];
+    const nextAssigned = assigned.filter((u) => u !== uid);
+    await fileDoc.ref.update({
+      assignedAthleteUids: nextAssigned,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  }
+
   // Delete weeks and nested results
   const weeksColl = userRef.collection('weeks');
   await deleteCollectionRecursive(weeksColl);

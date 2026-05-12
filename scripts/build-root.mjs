@@ -1,10 +1,7 @@
 import { rm, access, readdir, cp } from "node:fs/promises";
 import { constants } from "node:fs";
 import { resolve } from "node:path";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-
-const execFileAsync = promisify(execFile);
+import { spawn } from "node:child_process";
 const rootDir = resolve(process.cwd());
 const webDir = resolve(rootDir, "web");
 const webNextDir = resolve(webDir, ".next");
@@ -20,15 +17,35 @@ async function pathExists(path) {
 }
 
 async function runNpm(args) {
-  if (process.env.npm_execpath) {
-    await execFileAsync(process.execPath, [process.env.npm_execpath, ...args], {
-      stdio: "inherit",
-    });
-    return;
-  }
+  const useNpmExecPath = Boolean(process.env.npm_execpath);
 
-  const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-  await execFileAsync(npmCommand, args, { stdio: "inherit" });
+  const npmCommand = useNpmExecPath
+    ? process.execPath
+    : process.platform === "win32"
+      ? "npm.cmd"
+      : "npm";
+
+  const npmArgs = useNpmExecPath
+    ? [process.env.npm_execpath, ...args]
+    : args;
+
+  await new Promise((resolvePromise, rejectPromise) => {
+    const child = spawn(npmCommand, npmArgs, {
+      cwd: rootDir,
+      stdio: "inherit",
+      // On Windows, npm.cmd needs shell. Node + npm-cli.js must run without shell.
+      shell: !useNpmExecPath && process.platform === "win32",
+    });
+
+    child.on("error", (error) => rejectPromise(error));
+    child.on("close", (code) => {
+      if (code === 0) {
+        resolvePromise();
+      } else {
+        rejectPromise(new Error(`Command failed: ${npmCommand} ${npmArgs.join(" ")} (exit ${code})`));
+      }
+    });
+  });
 }
 
 async function main() {

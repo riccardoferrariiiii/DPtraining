@@ -38,6 +38,27 @@ export const deleteAthlete = functions.https.onCall(async (data, context) => {
   }
 
   try {
+    // 0) Legacy athletePrograms/{uid} (subcollections can exist without a parent doc)
+    const athleteProgramsDoc = db.collection("athletePrograms").doc(targetUid);
+    const athleteProgramSubcols = await athleteProgramsDoc.listCollections();
+    for (const sc of athleteProgramSubcols) {
+      await deleteCollectionRecursiveByRef(sc);
+    }
+
+    // 0b) Remove athlete from shared file assignments (metadata only; files stay for coach)
+    const sharedSnap = await db
+      .collection("sharedFiles")
+      .where("assignedAthleteUids", "array-contains", targetUid)
+      .get();
+    for (const fileDoc of sharedSnap.docs) {
+      const assigned: string[] = fileDoc.get("assignedAthleteUids") || [];
+      const nextAssigned = assigned.filter((u) => u !== targetUid);
+      await fileDoc.ref.update({
+        assignedAthleteUids: nextAssigned,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
     // 1) Delete weeks and nested results under users/{uid}/weeks
     const weeksColl = db.collection("users").doc(targetUid).collection("weeks");
     const weeksSnap = await weeksColl.get();
@@ -64,7 +85,7 @@ export const deleteAthlete = functions.https.onCall(async (data, context) => {
       await resultsDocRef.delete();
     }
 
-    // 6) Delete other top-level docs associated to the user if any (e.g., sharedFiles metadata assignments not removed)
+    // 6) Other top-level athlete data (sharedFiles assignments cleared in step 0b)
 
     // 7) Finally delete user document
     const userDocRef = db.collection("users").doc(targetUid);
