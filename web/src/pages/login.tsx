@@ -1,0 +1,306 @@
+import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence,
+} from "firebase/auth";
+import { auth, db } from "../lib/firebase";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { useSession } from "../lib/session";
+
+const REMEMBER_ME_KEY = "trained_remember_me";
+
+// Traduci errori Firebase in messaggi chiari
+function translateFirebaseError(error: any): string {
+  const code = error?.code || "";
+  const message = error?.message || "";
+
+  // Errori di autenticazione
+  if (code === "auth/invalid-email") return "Email non valida. Inserisci un'email con il formato corretto (es. nome@email.com)";
+  if (code === "auth/user-not-found") return "Utente non trovato. Controlla email e riprova.";
+  if (code === "auth/wrong-password") return "Password errata. Riprova.";
+  if (code === "auth/user-disabled") return "Questo account è stato disabilitato.";
+  if (code === "auth/too-many-login-attempts") return "Troppi tentativi di accesso. Riprova più tardi.";
+  if (code === "auth/email-already-in-use") return "Questa email è già registrata. Usa un'altra email o accedi.";
+  if (code === "auth/weak-password") return "Password troppo corta. Usa almeno 6 caratteri.";
+  if (code === "auth/invalid-password") return "Password non valida. Usa almeno 6 caratteri.";
+  if (code === "auth/missing-email") return "Email obbligatoria.";
+  if (code === "auth/missing-password") return "Password obbligatoria.";
+  if (code === "auth/network-request-failed") return "Errore di connessione. Controlla internet e riprova.";
+
+  // Fallback: mostra il messaggio di Firebase o il codice
+  return message || code || "Errore sconosciuto";
+}
+
+export default function Login() {
+  const router = useRouter();
+  const { user, loading: sessionLoading } = useSession();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [isRegister, setIsRegister] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
+  const [confirmMessage, setConfirmMessage] = useState("");
+  const [confirmType, setConfirmType] = useState<"success" | "error" | "warning">("success");
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(REMEMBER_ME_KEY);
+      if (stored === "0") setRememberMe(false);
+      if (stored === "1") setRememberMe(true);
+    } catch {
+      // Ignore storage read failures and keep default value.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (sessionLoading) return;
+    if (!user) return;
+    router.replace("/");
+  }, [sessionLoading, user, router]);
+
+  const login = async () => {
+    setLoading(true);
+    try {
+      try {
+        window.localStorage.setItem(REMEMBER_ME_KEY, rememberMe ? "1" : "0");
+      } catch {
+        // Non-blocking: auth works even if localStorage is unavailable.
+      }
+
+      // Persiste login sul browser corrente oppure solo per la sessione.
+      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
+      await signInWithEmailAndPassword(auth, email, password);
+      router.push("/");
+    } catch (e: any) {
+      setConfirmMessage(translateFirebaseError(e));
+      setConfirmType("error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const register = async () => {
+    if (!firstName.trim() || !lastName.trim()) {
+      setConfirmMessage("Nome e cognome obbligatori");
+      setConfirmType("error");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      try {
+        window.localStorage.setItem(REMEMBER_ME_KEY, rememberMe ? "1" : "0");
+      } catch {
+        // Non-blocking: auth works even if localStorage is unavailable.
+      }
+
+      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
+      const userCred = await createUserWithEmailAndPassword(auth, email, password);
+      const uid = userCred.user.uid;
+
+      // Salva i dati nel database
+      await setDoc(doc(db, "users", uid), {
+        email,
+        firstName,
+        lastName,
+        role: "athlete",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      router.push("/");
+    } catch (e: any) {
+      setConfirmMessage(translateFirebaseError(e));
+      setConfirmType("error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="container">
+      <div className="card" style={{ marginTop: 40, maxWidth: 420, margin: "40px auto 0" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 24 }}>
+          <img src="/logo.svg?v=4" alt="TRAINED" style={{ width: 40, height: 40 }} />
+        </div>
+
+        {!isRegister ? (
+          <>
+            <div style={{ marginTop: 20 }}>
+              <input
+                className="input"
+                placeholder="Email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+              />
+            </div>
+
+            <div style={{ marginTop: 10 }}>
+              <input
+                className="input"
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+              />
+            </div>
+
+            <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                type="checkbox"
+                id="rememberMe"
+                checked={rememberMe}
+                onChange={e => setRememberMe(e.target.checked)}
+                style={{ cursor: "pointer" }}
+              />
+              <label htmlFor="rememberMe" style={{ cursor: "pointer", fontSize: 14, opacity: 0.8 }}>
+                Ricordami
+              </label>
+            </div>
+
+            <button
+              className="btn btnPrimary"
+              style={{ marginTop: 20 }}
+              onClick={login}
+              disabled={loading}
+            >
+              {loading ? "..." : "Accedi"}
+            </button>
+
+            <button
+              className="btn"
+              style={{ marginTop: 10 }}
+              onClick={() => {
+                setIsRegister(true);
+                setEmail("");
+                setPassword("");
+                setFirstName("");
+                setLastName("");
+              }}
+            >
+              Crea Account
+            </button>
+
+            <button
+              className="btn"
+              style={{ marginTop: 10 }}
+              onClick={() => router.push(email.trim() ? `/reset-password?email=${encodeURIComponent(email.trim())}` : "/reset-password")}
+            >
+              Password dimenticata?
+            </button>
+          </>
+        ) : (
+          <>
+            <div style={{ marginTop: 20 }}>
+              <input
+                className="input"
+                placeholder="Email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+              />
+            </div>
+
+            <div style={{ marginTop: 10 }}>
+              <input
+                className="input"
+                placeholder="Nome"
+                value={firstName}
+                onChange={e => setFirstName(e.target.value)}
+              />
+            </div>
+
+            <div style={{ marginTop: 10 }}>
+              <input
+                className="input"
+                placeholder="Cognome"
+                value={lastName}
+                onChange={e => setLastName(e.target.value)}
+              />
+            </div>
+
+            <div style={{ marginTop: 10 }}>
+              <input
+                className="input"
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+              />
+            </div>
+
+            <button
+              className="btn btnPrimary"
+              style={{ marginTop: 20 }}
+              onClick={register}
+              disabled={loading}
+            >
+              {loading ? "..." : "Registrati"}
+            </button>
+
+            <button
+              className="btn"
+              style={{ marginTop: 10 }}
+              onClick={() => {
+                setIsRegister(false);
+                setEmail("");
+                setPassword("");
+                setFirstName("");
+                setLastName("");
+              }}
+            >
+              Torna al Login
+            </button>
+          </>
+        )}
+      </div>
+
+      {confirmMessage && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0, 0, 0, 1)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+          }}
+          onClick={() => setConfirmMessage("")}
+        >
+          <div
+            style={{
+              background: "linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.08))",
+              border: "1px solid rgba(255,255,255,0.16)",
+              borderRadius: 18,
+              padding: 24,
+              maxWidth: 420,
+              boxShadow: "0 24px 64px rgba(0,0,0,0.45)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 12 }}>
+              {confirmType === "success" ? "✅ Successo" : confirmType === "error" ? "❌ Errore" : "⚠️ Attenzione"}
+            </div>
+            <div style={{ color: "rgba(245,245,247,0.75)", marginBottom: 20 }}>
+              {confirmMessage}
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button className="btn btnPrimary" onClick={() => setConfirmMessage("")}>
+                Ok
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

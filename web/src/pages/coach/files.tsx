@@ -1,0 +1,511 @@
+import { useEffect, useMemo, useState } from "react";
+import { RoleGuard } from "../../components/RoleGuard";
+import { TopBar } from "../../components/TopBar";
+import { useSession } from "../../lib/session";
+import { db } from "../../lib/firebase";
+import { createUniqueInAppNotification } from "../../lib/inAppNotifications";
+import {
+  AthleteOption,
+  buildAthleteLabel,
+  createSharedFileId,
+  formatBytes,
+  formatDateLabel,
+  sharedFileDoc,
+  sharedFilesCollection,
+  SharedFile,
+} from "../../lib/sharedFiles";
+import {
+  collection,
+  deleteDoc,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+  where,
+} from "firebase/firestore";
+
+function fileLabel(file: SharedFile) {
+  return file.fileName || file.originalName || "File";
+}
+
+export default function CoachFilesPage() {
+  return (
+    <RoleGuard role="coach">
+      <CoachFilesInner />
+    </RoleGuard>
+  );
+}
+
+function CoachFilesInner() {
+  const { user } = useSession();
+  const [athletes, setAthletes] = useState<AthleteOption[]>([]);
+  const [files, setFiles] = useState<SharedFile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedUploadFile, setSelectedUploadFile] = useState<File | null>(null);
+  const [displayName, setDisplayName] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [draftNames, setDraftNames] = useState<Record<string, string>>({});
+  const [activeAssignFile, setActiveAssignFile] = useState<SharedFile | null>(null);
+  const [assignDraft, setAssignDraft] = useState<string[]>([]);
+  const [searchAthlete, setSearchAthlete] = useState("");
+  const [message, setMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+  const [pendingDeleteFile, setPendingDeleteFile] = useState<SharedFile | null>(null);
+  const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const qAthletes = query(collection(db, "users"), where("role", "==", "athlete"));
+    const unsubAthletes = onSnapshot(qAthletes, (snap) => {
+      const next = snap.docs.map((d) => ({ uid: d.id, ...(d.data() as any) }));
+      setAthletes(next);
+    });
+
+    const qFiles = query(sharedFilesCollection(), orderBy("createdAt", "desc"));
+    const unsubFiles = onSnapshot(
+      qFiles,
+      (snap) => {
+        const next = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+        setFiles(next);
+        setDraftNames((prev) => {
+          const merged = { ...prev };
+          next.forEach((file) => {
+            if (!merged[file.id]) {
+              merged[file.id] = file.fileName || file.originalName || "";
+            }
+          });
+          return merged;
+        });
+        setLoading(false);
+      },
+      () => setLoading(false)
+    );
+
+    return () => {
+      unsubAthletes();
+      unsubFiles();
+    };
+  }, []);
+
+  const filteredAthletes = useMemo(() => {
+    const q = searchAthlete.trim().toLowerCase();
+    if (!q) return athletes;
+    return athletes.filter((athlete) => buildAthleteLabel(athlete).toLowerCase().includes(q));
+  }, [athletes, searchAthlete]);
+
+  const openAssignModal = (file: SharedFile) => {
+    setActiveAssignFile(file);
+    setAssignDraft([...(file.assignedAthleteUids || [])]);
+    setSearchAthlete("");
+  };
+
+  const uploadFile = async () => {
+    if (!user?.uid || !selectedUploadFile) return;
+
+    setUploading(true);
+    setMessage(null);
+
+    try {
+      const fileId = createSharedFileId();
+      const finalName = displayName.trim() || selectedUploadFile.name;
+      const formData = new FormData();
+      formData.append("fileId", fileId);
+      formData.append("fileName", finalName);
+      formData.append("file", selectedUploadFile);
+
+      // Upload the file through the server so the browser never talks to Storage directly.
+      const uploadRes = await fetch("/api/uploadFile", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!uploadRes.ok) {
+        const errorData = await uploadRes.json().catch(() => ({}));
+        throw new Error(errorData.error || `Upload failed: ${uploadRes.status}`);
+      }
+
+      const { storagePath, downloadUrl } = await uploadRes.json();
+
+      // Save metadata to Firestore after the server confirms the upload.
+      await setDoc(sharedFileDoc(fileId), {
+        fileName: finalName,
+        originalName: selectedUploadFile.name,
+        storagePath,
+        downloadUrl,
+        mimeType: selectedUploadFile.type || "application/octet-stream",
+        sizeBytes: selectedUploadFile.size,
+        assignedAthleteUids: [],
+        uploadedByUid: user.uid,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      setSelectedUploadFile(null);
+      setDisplayName("");
+      setMessage({ kind: "success", text: "File caricato correttamente." });
+    } catch (error: any) {
+      setMessage({ kind: "error", text: String(error?.message || error) });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const saveFileName = async (file: SharedFile) => {
+    const nextName = (draftNames[file.id] || "").trim();
+    if (!nextName) return;
+
+    await updateDoc(sharedFileDoc(file.id), {
+      fileName: nextName,
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const saveAssignments = async () => {
+    if (!activeAssignFile) return;
+
+    await updateDoc(sharedFileDoc(activeAssignFile.id), {
+      assignedAthleteUids: assignDraft,
+      updatedAt: serverTimestamp(),
+    });
+
+    const recipients = Array.from(new Set(assignDraft));
+    await Promise.all(
+      recipients.map((uid) =>
+        createUniqueInAppNotification(uid, `file-assigned-${activeAssignFile.id}`, {
+          type: "file_assigned",
+          title: "Nuovo file pubblicato",
+          message: `Il coach ti ha assegnato ${fileLabel(activeAssignFile)}.`,
+          link: "/athlete/files",
+        })
+      )
+    );
+
+    setActiveAssignFile(null);
+  };
+
+  const deleteFile = async (file: SharedFile) => {
+    setPendingDeleteFile(file);
+  };
+
+  const confirmDeleteFile = async () => {
+    if (!pendingDeleteFile) return;
+
+    setDeletingFileId(pendingDeleteFile.id);
+
+    try {
+      // Delete from storage via server API
+      await fetch("/api/deleteFile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storagePath: pendingDeleteFile.storagePath }),
+      }).catch(() => {
+        // If storage deletion fails, still remove metadata.
+      });
+    } catch {
+      // If storage object is already gone, still remove metadata.
+    }
+
+    await deleteDoc(sharedFileDoc(pendingDeleteFile.id));
+    setPendingDeleteFile(null);
+    setDeletingFileId(null);
+  };
+
+  return (
+    <>
+      <TopBar title="Gestisci File" />
+      <div className="container" style={{ paddingBottom: 40 }}>
+        <div className="card" style={{ marginTop: 20 }}>
+          <h2 style={{ marginBottom: 8 }}>Carica un file</h2>
+          <div style={{ opacity: 0.8, marginBottom: 16 }}>
+            Puoi caricare qualsiasi estensione, rinominare il file e assegnarlo a uno o piu atleti.
+          </div>
+
+          {message && (
+            <div
+              className="card"
+              style={{
+                marginBottom: 16,
+                borderColor: message.kind === "error" ? "rgba(255,90,90,0.5)" : "rgba(105,205,120,0.45)",
+                background: message.kind === "error" ? "rgba(255,90,90,0.08)" : "rgba(105,205,120,0.08)",
+              }}
+            >
+              {message.text}
+            </div>
+          )}
+
+          <div className="row" style={{ gap: 12, alignItems: "end" }}>
+            <div style={{ flex: "1 1 280px" }}>
+              <label className="small" style={{ display: "block", marginBottom: 8 }}>
+                File
+              </label>
+              <input
+                type="file"
+                className="input"
+                style={{ width: "100%" }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0] || null;
+                  setSelectedUploadFile(file);
+                  setDisplayName(file?.name || "");
+                }}
+              />
+            </div>
+
+            <div style={{ flex: "1 1 280px" }}>
+              <label className="small" style={{ display: "block", marginBottom: 8 }}>
+                Nome file modificabile
+              </label>
+              <input
+                className="input"
+                style={{ width: "100%" }}
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Nome mostrato agli atleti"
+              />
+            </div>
+
+            <button className="btn btnPrimary" onClick={uploadFile} disabled={!selectedUploadFile || uploading}>
+              {uploading ? "Caricamento..." : "Aggiungi file"}
+            </button>
+          </div>
+
+          {selectedUploadFile && (
+            <div className="small" style={{ marginTop: 10, opacity: 0.8 }}>
+              Selezionato: {selectedUploadFile.name} ({formatBytes(selectedUploadFile.size)})
+            </div>
+          )}
+        </div>
+
+        <div className="card" style={{ marginTop: 20 }}>
+          <h2 style={{ marginBottom: 12 }}>File caricati</h2>
+
+          {loading ? (
+            <div className="small">Caricamento...</div>
+          ) : files.length === 0 ? (
+            <div className="small">Nessun file caricato ancora.</div>
+          ) : (
+            <div className="stack" style={{ gap: 14 }}>
+              {files.map((file) => {
+                const assignedNames = (file.assignedAthleteUids || [])
+                  .map((uid) => athletes.find((athlete) => athlete.uid === uid))
+                  .filter(Boolean)
+                  .map((athlete) => buildAthleteLabel(athlete as AthleteOption));
+
+                return (
+                  <div
+                    key={file.id}
+                    className="card"
+                    style={{
+                      padding: 16,
+                      background: "rgba(255,255,255,0.04)",
+                      borderColor: "rgba(255,255,255,0.12)",
+                    }}
+                  >
+                    <div className="row" style={{ justifyContent: "space-between", gap: 16, alignItems: "start" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>{fileLabel(file)}</div>
+                        <div className="small" style={{ marginBottom: 8 }}>
+                          Originale: {file.originalName} | {formatBytes(file.sizeBytes)} | {formatDateLabel(file.createdAt)}
+                        </div>
+                        <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                          <a className="btn btnPrimary" href={file.downloadUrl} target="_blank" rel="noreferrer">
+                            Visualizza file
+                          </a>
+                          <button className="btn" onClick={() => openAssignModal(file)}>
+                            Assegna atleti
+                          </button>
+                          <button className="btn btnDanger" onClick={() => deleteFile(file)}>
+                            Elimina
+                          </button>
+                        </div>
+                      </div>
+
+                      <div style={{ flex: "0 1 320px", minWidth: 260 }}>
+                        <label className="small" style={{ display: "block", marginBottom: 8 }}>
+                          Nome modificabile
+                        </label>
+                        <input
+                          className="input"
+                          style={{ width: "100%" }}
+                          value={draftNames[file.id] || ""}
+                          onChange={(e) => setDraftNames((prev) => ({ ...prev, [file.id]: e.target.value }))}
+                        />
+                        <button className="btn" style={{ marginTop: 10 }} onClick={() => saveFileName(file)}>
+                          Salva nome
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: 14 }}>
+                      <div className="small" style={{ marginBottom: 6 }}>
+                        Assegnato a {assignedNames.length} atleta/e
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                        {assignedNames.length === 0 ? (
+                          <span className="small" style={{ opacity: 0.7 }}>
+                            Nessun atleta assegnato
+                          </span>
+                        ) : (
+                          assignedNames.map((name) => (
+                            <span
+                              key={name}
+                              style={{
+                                padding: "6px 10px",
+                                borderRadius: 999,
+                                background: "rgba(100,149,237,0.14)",
+                                border: "1px solid rgba(100,149,237,0.3)",
+                                fontSize: 13,
+                              }}
+                            >
+                              {name}
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {activeAssignFile && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0, 0, 0, 1)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: 16,
+          }}
+          onClick={() => setActiveAssignFile(null)}
+        >
+          <div
+            className="card"
+            style={{
+              maxWidth: 500,
+              maxHeight: "80vh",
+              overflow: "auto",
+              padding: 24,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ marginBottom: 8 }}>Assegna file agli atleti</h2>
+            <div className="small" style={{ marginBottom: 14, opacity: 0.8 }}>
+              Seleziona gli atleti a cui vuoi assegnare questo file.
+            </div>
+            <div className="small" style={{ marginBottom: 14, fontWeight: 700 }}>
+              {fileLabel(activeAssignFile)}
+            </div>
+
+            <input
+              className="input"
+              style={{ width: "100%", marginBottom: 14 }}
+              value={searchAthlete}
+              onChange={(e) => setSearchAthlete(e.target.value)}
+              placeholder="Cerca atleta"
+            />
+
+            <div className="stack" style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+              {filteredAthletes.map((athlete) => {
+                const checked = assignDraft.includes(athlete.uid);
+                return (
+                  <label
+                    key={athlete.uid}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      padding: 10,
+                      backgroundColor: checked
+                        ? "rgba(76, 175, 80, 0.1)"
+                        : "rgba(245, 245, 247, 0.05)",
+                      borderRadius: 6,
+                    }}
+                  >
+                    <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", flex: 1 }}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          setAssignDraft((prev) =>
+                            e.target.checked
+                              ? Array.from(new Set([...prev, athlete.uid]))
+                              : prev.filter((uid) => uid !== athlete.uid)
+                          );
+                        }}
+                      />
+                      <span>{buildAthleteLabel(athlete)}</span>
+                    </label>
+                  </label>
+                );
+              })}
+            </div>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+              <button className="btn" onClick={() => setActiveAssignFile(null)}>
+                Annulla
+              </button>
+              <button className="btn btnPrimary" onClick={saveAssignments}>
+                Salva assegnazione
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingDeleteFile && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0, 0, 0, 1)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10000,
+          }}
+          onClick={() => {
+            if (!deletingFileId) setPendingDeleteFile(null);
+          }}
+        >
+          <div
+            style={{
+              background: "linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.08))",
+              border: "1px solid rgba(255,255,255,0.16)",
+              borderRadius: 18,
+              padding: 24,
+              width: "min(92vw, 460px)",
+              boxShadow: "0 24px 64px rgba(0,0,0,0.45)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 12 }}>⚠️ Conferma eliminazione</div>
+            <div style={{ color: "rgba(245,245,247,0.75)", marginBottom: 20 }}>
+              Vuoi eliminare <strong>{fileLabel(pendingDeleteFile)}</strong>?
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button className="btn" onClick={() => setPendingDeleteFile(null)} disabled={!!deletingFileId}>
+                Annulla
+              </button>
+              <button className="btn btnDanger" onClick={confirmDeleteFile} disabled={!!deletingFileId}>
+                {deletingFileId ? "Eliminazione..." : "Elimina file"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
