@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "dev": "cd web && next dev",
-    "build": "npm ci --prefix web && npm run build --prefix web",
+    "build": "npm ci && npm ci --prefix web && npm run build --prefix web && node scripts/sync-next-to-root.mjs",
     "start": "cd web && next start",
     "export": "cd web && next export"
   },
