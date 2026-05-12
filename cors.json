@@ -1,0 +1,8 @@
+[
+  {
+    "origin": ["https://dptraining-phi.vercel.app", "https://dptraining.vercel.app", "http://localhost:3000", "http://localhost:3001"],
+    "method": ["GET", "HEAD", "DELETE", "PUT", "POST"],
+    "responseHeader": ["Content-Type", "x-goog-meta-uploaded-content-length"],
+    "maxAgeSeconds": 3600
+  }
+]

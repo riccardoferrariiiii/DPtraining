@@ -1,0 +1,78 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+    function isCoach() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(uid())).data.role == "coach";
+    }
+    function isSelf(userId) { return isSignedIn() && uid() == userId; }
+
+    match /users/{userId} {
+      allow read: if isSelf(userId) || isCoach() || (isSignedIn() && resource.data.role == "coach");
+      allow create: if isSelf(userId);
+      allow update: if isSelf(userId) || isCoach();
+      allow delete: if isCoach();
+
+      match /weeks/{weekId} {
+        allow read: if isSelf(userId) || isCoach();
+        allow create, update, delete: if isCoach();
+
+        match /results/{resultId} {
+          allow read: if isSelf(userId) || isCoach();
+          allow create, update: if isSelf(userId) || isCoach();
+          allow delete: if false;
+        }
+      }
+
+      match /notifications/{notificationId} {
+        allow read, update, delete: if isSelf(userId) || isCoach();
+        allow create: if isSignedIn() && (
+          isSelf(userId) ||
+          isCoach() ||
+          get(/databases/$(database)/documents/users/$(userId)).data.role == "coach"
+        );
+      }
+
+      match /prs/{prId} {
+        allow read: if isSelf(userId) || isCoach();
+        allow create, update: if isSelf(userId);
+        allow delete: if isSelf(userId) || isCoach();
+      }
+    }
+
+    match /sharedFiles/{fileId} {
+      allow read: if isCoach() || (isSignedIn() && resource.data.assignedAthleteUids.hasAny([uid()]));
+      allow create, update, delete: if isSignedIn();
+    }
+
+    match /athletePrograms/{athleteUid}/weeks/{weekId} {
+      allow read: if isSelf(athleteUid) || isCoach();
+      allow create, update, delete: if isCoach();
+      match /days/{dayId} {
+        allow read: if isSelf(athleteUid) || isCoach();
+        allow create, update, delete: if isCoach();
+        match /workouts/{workoutId} {
+          allow read: if isSelf(athleteUid) || isCoach();
+          allow create, update, delete: if isCoach();
+        }
+      }
+    }
+
+    match /results/{athleteUid}/entries/{entryId} {
+      allow read: if isSelf(athleteUid) || isCoach();
+      allow create, update: if isSelf(athleteUid);
+      allow delete: if isCoach();
+    }
+
+    match /programTemplates/{templateId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isCoach();
+
+      match /days/{dayId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if isCoach();
+      }
+    }
+  }
+}
