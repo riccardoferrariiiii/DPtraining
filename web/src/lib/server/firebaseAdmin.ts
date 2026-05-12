@@ -72,3 +72,31 @@ export function getFirebaseAdmin(): typeof admin {
     "Firebase Admin non configurato: su Vercel imposta FIREBASE_SERVICE_ACCOUNT_JSON (JSON del service account) oppure FIREBASE_SERVICE_ACCOUNT_BASE64, oppure FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY + FIREBASE_PROJECT_ID. Vedi .env.example."
   );
 }
+
+/** Messaggio leggibile da errori Firebase / Node (non sempre instanceof Error). */
+export function formatServerError(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === "object" && err !== null) {
+    const o = err as Record<string, unknown>;
+    if (typeof o.message === "string" && o.message) return o.message;
+    const info = o.errorInfo as { message?: string; code?: string } | undefined;
+    if (info && typeof info.message === "string" && info.message) {
+      const ic = info.code;
+      return typeof ic === "string" && ic ? `${ic}: ${info.message}` : info.message;
+    }
+    const code = o.code;
+    if (typeof code === "string" && (code.startsWith("auth/") || code.startsWith("firestore/"))) {
+      const m = typeof o.message === "string" ? o.message : "errore";
+      return `${code}: ${m}`;
+    }
+    if (typeof code === "number") {
+      const m = typeof o.message === "string" ? o.message : "errore API/Firestore";
+      return `${m} (code ${code})`;
+    }
+    const details = o.details;
+    if (typeof details === "string" && details) {
+      return details;
+    }
+  }
+  return String(err);
+}

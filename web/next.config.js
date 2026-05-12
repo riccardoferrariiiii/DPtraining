@@ -8,4 +8,5 @@ module.exports = {
 	outputFileTracingRoot: path.join(__dirname),
 	turbopack: { root: path.join(__dirname) },
 	images: { unoptimized: true },
+	serverExternalPackages: ["firebase-admin"],
 };

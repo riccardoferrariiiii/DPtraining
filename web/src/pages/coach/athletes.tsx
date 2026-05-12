@@ -429,15 +429,31 @@ function CoachAthletesInner() {
         body: JSON.stringify({ uid: athlete.uid }),
       });
 
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const text = await res.text();
+      let data: { error?: string; code?: string } = {};
+      try {
+        if (text) data = JSON.parse(text) as { error?: string; code?: string };
+      } catch {
+        // risposta non JSON (es. HTML errore edge)
+      }
       if (!res.ok) {
-        let msg = typeof data.error === "string" ? data.error : `Errore durante l'eliminazione (${res.status})`;
+        const fromBody =
+          typeof data.error === "string" && data.error.trim() ? data.error.trim() : "";
+        const fromRaw = text.trim().slice(0, 800);
+        let msg =
+          fromBody ||
+          fromRaw ||
+          `Errore durante l'eliminazione (${res.status})`;
+        if (typeof data.code === "string" && data.code) {
+          msg = `${msg} (${data.code})`;
+        }
         if (res.status === 503) {
           msg =
             "Eliminazione incompleta: mancano le credenziali Firebase Admin su Vercel. " +
             "Aggiungi la variabile FIREBASE_SERVICE_ACCOUNT_JSON (o FIREBASE_SERVICE_ACCOUNT_BASE64) nelle Environment Variables del progetto Vercel, poi Redeploy. " +
-            (typeof data.error === "string" ? data.error : "");
+            (fromBody || "");
         }
+        console.error("[coachDeleteAthlete] HTTP", res.status, { error: data.error, code: data.code }, text.slice(0, 400));
         setConfirmMessage(msg.trim());
         setConfirmType("error");
         return;

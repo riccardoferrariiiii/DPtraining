@@ -1,6 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getFirebaseAdmin } from "../../lib/server/firebaseAdmin";
+import { getFirebaseAdmin, formatServerError } from "../../lib/server/firebaseAdmin";
 import { coachDeleteAthleteCore } from "../../lib/server/coachDeleteAthleteCore";
+
+/** Vercel / Next: consente eliminazioni con molti documenti (default spesso troppo basso). */
+export const config = {
+  maxDuration: 120,
+};
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -18,7 +23,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     adminSdk = getFirebaseAdmin();
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
+    const msg = formatServerError(e);
     console.error("coachDeleteAthlete: Firebase Admin init:", msg);
     return res.status(503).json({
       error:
@@ -49,8 +54,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await coachDeleteAthleteCore(adminSdk.firestore(), adminSdk.auth(), targetUid);
     return res.status(200).json({ success: true });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = formatServerError(err);
+    const code =
+      typeof err === "object" && err !== null && "code" in err
+        ? String((err as { code?: string }).code || "")
+        : "";
     console.error("coachDeleteAthlete:", err);
-    return res.status(500).json({ error: message || "Eliminazione fallita." });
+    return res.status(500).json({
+      error: message || "Eliminazione fallita.",
+      code: code || undefined,
+    });
   }
 }
