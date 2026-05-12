@@ -13,6 +13,28 @@ import { useSession } from "../lib/session";
 
 const REMEMBER_ME_KEY = "trained_remember_me";
 
+// Traduci errori Firebase in messaggi chiari
+function translateFirebaseError(error: any): string {
+  const code = error?.code || "";
+  const message = error?.message || "";
+
+  // Errori di autenticazione
+  if (code === "auth/invalid-email") return "Email non valida. Inserisci un'email con il formato corretto (es. nome@email.com)";
+  if (code === "auth/user-not-found") return "Utente non trovato. Controlla email e riprova.";
+  if (code === "auth/wrong-password") return "Password errata. Riprova.";
+  if (code === "auth/user-disabled") return "Questo account è stato disabilitato.";
+  if (code === "auth/too-many-login-attempts") return "Troppi tentativi di accesso. Riprova più tardi.";
+  if (code === "auth/email-already-in-use") return "Questa email è già registrata. Usa un'altra email o accedi.";
+  if (code === "auth/weak-password") return "Password troppo corta. Usa almeno 6 caratteri.";
+  if (code === "auth/invalid-password") return "Password non valida. Usa almeno 6 caratteri.";
+  if (code === "auth/missing-email") return "Email obbligatoria.";
+  if (code === "auth/missing-password") return "Password obbligatoria.";
+  if (code === "auth/network-request-failed") return "Errore di connessione. Controlla internet e riprova.";
+
+  // Fallback: mostra il messaggio di Firebase o il codice
+  return message || code || "Errore sconosciuto";
+}
+
 export default function Login() {
   const router = useRouter();
   const { user, loading: sessionLoading } = useSession();
@@ -56,7 +78,7 @@ export default function Login() {
       await signInWithEmailAndPassword(auth, email, password);
       router.push("/");
     } catch (e: any) {
-      setConfirmMessage("Errore login: " + (e?.message ?? e));
+      setConfirmMessage(translateFirebaseError(e));
       setConfirmType("error");
     } finally {
       setLoading(false);
@@ -94,7 +116,7 @@ export default function Login() {
 
       router.push("/");
     } catch (e: any) {
-      setConfirmMessage("Errore registrazione: " + (e?.message ?? e));
+      setConfirmMessage(translateFirebaseError(e));
       setConfirmType("error");
     } finally {
       setLoading(false);
