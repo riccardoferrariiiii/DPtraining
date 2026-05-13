@@ -78,10 +78,16 @@ export async function coachDeleteAthleteCore(
 
   await ensureAuthUserRemoved(auth, targetUid, athleteEmail);
 
-  const athleteProgramsDoc = db.collection("athletePrograms").doc(targetUid);
-  const athleteProgramSubcols = await athleteProgramsDoc.listCollections();
-  for (const sc of athleteProgramSubcols) {
-    await deleteCollectionRecursiveByRef(sc);
+  // Delete athletePrograms/{uid} subcollections (doc may not exist)
+  try {
+    const athleteProgramsDoc = db.collection("athletePrograms").doc(targetUid);
+    const athleteProgramSubcols = await athleteProgramsDoc.listCollections();
+    for (const sc of athleteProgramSubcols) {
+      await deleteCollectionRecursiveByRef(sc);
+    }
+  } catch (err) {
+    // Ignore errors if document structure doesn't exist
+    console.warn("Note: athletePrograms/{uid} subcollections may not exist:", err);
   }
 
   const sharedSnap = await db

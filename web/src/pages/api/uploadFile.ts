@@ -42,7 +42,7 @@ export default async function handler(
         .json({ error: "Missing fileId, fileName, or file" });
     }
 
-    const bucket = process.env.NEXT_PUBLIC_SUPABASE_BUCKET || "shered-files";
+    const bucket = process.env.NEXT_PUBLIC_SUPABASE_BUCKET || "shared-files";
     const storagePath = `${fileId}/${fileName}`;
 
     // Read file from disk

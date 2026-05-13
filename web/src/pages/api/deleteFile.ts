@@ -21,7 +21,7 @@ export default async function handler(
       return res.status(400).json({ error: "Missing storagePath" });
     }
 
-    const bucket = process.env.NEXT_PUBLIC_SUPABASE_BUCKET || "shered-files";
+    const bucket = process.env.NEXT_PUBLIC_SUPABASE_BUCKET || "shared-files";
 
     const { error } = await supabase.storage
       .from(bucket)
