@@ -28,15 +28,15 @@ export default async function handler(
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  try {
-    const config = getSupabaseServerConfig();
-    if (!config) {
-      return res.status(503).json({
-        error:
-          "Supabase server configuration missing. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on Vercel.",
-      });
-    }
+  const config = getSupabaseServerConfig();
+  if (!config) {
+    return res.status(503).json({
+      error:
+        "Supabase server configuration missing. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on Vercel.",
+    });
+  }
 
+  try {
     const supabase = createClient(config.supabaseUrl, config.supabaseServiceRoleKey, {
       auth: {
         persistSession: false,
@@ -45,7 +45,6 @@ export default async function handler(
     });
 
     const form = new IncomingForm();
-
     const [fields, files] = await form.parse(req);
 
     const fileId = fields.fileId?.[0];
@@ -87,6 +86,6 @@ export default async function handler(
     });
   } catch (error: any) {
     console.error("API error:", error);
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message || "Upload failed" });
   }
 }
