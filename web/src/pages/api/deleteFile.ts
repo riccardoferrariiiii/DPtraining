@@ -1,10 +1,16 @@
 import { createClient } from "@supabase/supabase-js";
 import type { NextApiRequest, NextApiResponse } from "next";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+function getSupabaseServerConfig() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 
-const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+  if (!supabaseUrl || !supabaseServiceRoleKey) {
+    return null;
+  }
+
+  return { supabaseUrl, supabaseServiceRoleKey };
+}
 
 export default async function handler(
   req: NextApiRequest,
@@ -15,6 +21,16 @@ export default async function handler(
   }
 
   try {
+    const config = getSupabaseServerConfig();
+    if (!config) {
+      return res.status(503).json({
+        error:
+          "Supabase server configuration missing. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on Vercel.",
+      });
+    }
+
+    const supabase = createClient(config.supabaseUrl, config.supabaseServiceRoleKey);
+
     const { storagePath } = req.body;
 
     if (!storagePath) {

@@ -1,6 +1,4 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getFirebaseAdmin, formatServerError } from "../../lib/server/firebaseAdmin";
-import { coachDeleteAthleteCore } from "../../lib/server/coachDeleteAthleteCore";
 
 /** Vercel / Next: consente eliminazioni con molti documenti (default spesso troppo basso). */
 export const config = {
@@ -25,6 +23,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const idToken = authHeader.slice("Bearer ".length).trim();
+
+  let getFirebaseAdmin: typeof import("../../lib/server/firebaseAdmin").getFirebaseAdmin;
+  let formatServerError: typeof import("../../lib/server/firebaseAdmin").formatServerError;
+  let coachDeleteAthleteCore: typeof import("../../lib/server/coachDeleteAthleteCore").coachDeleteAthleteCore;
+
+  try {
+    ({ getFirebaseAdmin, formatServerError } = await import("../../lib/server/firebaseAdmin"));
+    ({ coachDeleteAthleteCore } = await import("../../lib/server/coachDeleteAthleteCore"));
+  } catch (e: unknown) {
+    console.error("coachDeleteAthlete: module load failed:", e);
+    return res.status(500).json({
+      error: "Impossibile caricare il server backend per l'eliminazione atleta.",
+    });
+  }
 
   let adminSdk: ReturnType<typeof getFirebaseAdmin>;
   try {

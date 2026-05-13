@@ -3,15 +3,16 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { IncomingForm } from "formidable";
 import fs from "fs";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+function getSupabaseServerConfig() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 
-const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-  },
-});
+  if (!supabaseUrl || !supabaseServiceRoleKey) {
+    return null;
+  }
+
+  return { supabaseUrl, supabaseServiceRoleKey };
+}
 
 export const config = {
   api: {
@@ -28,6 +29,21 @@ export default async function handler(
   }
 
   try {
+    const config = getSupabaseServerConfig();
+    if (!config) {
+      return res.status(503).json({
+        error:
+          "Supabase server configuration missing. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on Vercel.",
+      });
+    }
+
+    const supabase = createClient(config.supabaseUrl, config.supabaseServiceRoleKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
+
     const form = new IncomingForm();
 
     const [fields, files] = await form.parse(req);
@@ -49,7 +65,7 @@ export default async function handler(
     const fileContent = fs.readFileSync(file.filepath);
 
     // Upload directly via service role
-    const { data, error } = await supabase.storage
+    const { error } = await supabase.storage
       .from(bucket)
       .upload(storagePath, fileContent, {
         contentType: file.mimetype || "application/octet-stream",
@@ -62,7 +78,7 @@ export default async function handler(
     }
 
     // Generate public URL
-    const downloadUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${bucket}/${storagePath}`;
+    const downloadUrl = `${config.supabaseUrl}/storage/v1/object/public/${bucket}/${storagePath}`;
 
     return res.status(200).json({
       success: true,
