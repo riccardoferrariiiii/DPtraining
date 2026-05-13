@@ -1,6 +1,7 @@
 {
   "framework": "nextjs",
-  "buildCommand": "cd web && npm ci && npm run build && cd .. && node scripts/sync-next-to-root.mjs",
+  "buildCommand": "cd web && npm ci && npm run build",
+  "outputDirectory": "web/.next",
   "headers": [
     {
       "source": "/",
