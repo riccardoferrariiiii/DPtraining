@@ -1,9 +1,14 @@
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { getToken } from "firebase/messaging";
-import { db, messaging } from "./firebase";
+import { db, getFirebaseMessaging } from "./firebase";
 
 export async function requestPushNotifications(uid: string): Promise<{ enabled: boolean; reason?: string; token?: string }> {
   if (!uid || typeof window === "undefined" || !("Notification" in window)) {
+    return { enabled: false, reason: "unsupported" };
+  }
+
+  const messaging = await getFirebaseMessaging();
+  if (!messaging) {
     return { enabled: false, reason: "unsupported" };
   }
 
@@ -20,10 +25,6 @@ export async function requestPushNotifications(uid: string): Promise<{ enabled: 
     if (permission !== "granted") {
       return { enabled: false, reason: permission === "denied" ? "denied" : "blocked" };
     }
-  }
-
-  if (!messaging) {
-    return { enabled: false, reason: "unsupported" };
   }
 
   const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY || "";

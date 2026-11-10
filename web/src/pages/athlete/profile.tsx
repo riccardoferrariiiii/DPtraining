@@ -107,7 +107,7 @@ export default function AthleteProfilePage() {
       <TopBar title="Profilo atleta" />
       <div className="container">
         <div
-          className="card"
+          className="card profileCard"
           style={{
             marginTop: 20,
             background: "linear-gradient(135deg, rgba(47,134,199,0.10), rgba(10,11,13,0.96) 48%, rgba(255,255,255,0.04))",
@@ -127,7 +127,7 @@ export default function AthleteProfilePage() {
           </div>
 
           <div style={{ display: "grid", gap: 14 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
+            <div className="profileFormGrid">
               <label className="field">
                 <span>Nome</span>
                 <input className="input" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Nome" />
@@ -138,10 +138,10 @@ export default function AthleteProfilePage() {
               </label>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
+            <div className="profileFormGrid">
               <label className="field">
                 <span>Data di nascita</span>
-                <input className="input" type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} />
+                <input className="input profileDateInput" type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} />
               </label>
               <label className="field">
                 <span>Peso (kg)</span>
@@ -149,7 +149,7 @@ export default function AthleteProfilePage() {
               </label>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
+            <div className="profileFormGrid">
               <label className="field">
                 <span>Altezza (cm)</span>
                 <input className="input" type="number" step="1" value={heightCm} onChange={(e) => setHeightCm(e.target.value)} placeholder="180" />
@@ -174,7 +174,7 @@ export default function AthleteProfilePage() {
             </div>
           )}
 
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginTop: 20, flexWrap: "wrap" }}>
+          <div className="profileActions">
             <Link href="/athlete-home" className="btn">
               Torna alla home
             </Link>

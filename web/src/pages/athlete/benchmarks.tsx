@@ -172,6 +172,27 @@ const GROUP_META: Record<BenchmarkGroup, GroupMeta> = {
   },
 };
 
+const GROUP_ICONS: Record<BenchmarkGroup, string> = {
+  "weightlifting-strength": "WS",
+  gymnastic: "GY",
+  monostructural: "MO",
+  crossfit: "CF",
+};
+
+function BenchmarkProgressRing({ label, value, color, icon }: { label: string; value: number; color: string; icon: string }) {
+  return (
+    <div className="benchmarkCategoryCard" style={{ border: "1px solid rgba(47,134,199,0.16)", borderRadius: 16, padding: 12, background: "linear-gradient(180deg, rgba(10,11,13,0.94), rgba(18,20,24,0.94))" }}>
+      <div className="benchmarkProgressRing" style={{ "--ring-color": color, "--ring-progress": `${value}%` } as React.CSSProperties}>
+        <div className="benchmarkProgressRingInner">
+          <span className="benchmarkProgressRingIcon">{icon}</span>
+          <strong className="benchmarkProgressRingValue">{value}%</strong>
+        </div>
+      </div>
+      <strong className="benchmarkCategoryLabel" style={{ color: "#F8F4EA" }}>{label}</strong>
+    </div>
+  );
+}
+
 const BENCHMARK_LIBRARY: Record<BenchmarkGroup, CatalogEntry[]> = {
   "weightlifting-strength": [
     { name: "Back Squat", kind: "weight" },
@@ -834,10 +855,10 @@ export default function AthleteBenchmarksPage() {
           {items.length === 0 ? (
             <div style={{ opacity: 0.8, padding: "12px 0", color: "#F8F4EA" }}>Nessun benchmark registrato. Aggiungi il tuo primo PR per iniziare il confronto delle performance.</div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.2fr) minmax(280px, 0.8fr)", gap: 20, alignItems: "center" }}>
-              <div style={{ width: "100%", border: "1px solid rgba(47,134,199,0.18)", borderRadius: 18, background: "radial-gradient(circle at top, rgba(47,134,199,0.08), rgba(10,11,13,0.94))", padding: 18 }}>
+            <div className="benchmarkOverviewGrid">
+              <div className="benchmarkRadarPanel" style={{ border: "1px solid rgba(47,134,199,0.18)", borderRadius: 18, background: "radial-gradient(circle at top, rgba(47,134,199,0.08), rgba(10,11,13,0.94))", padding: 18 }}>
                 <div style={{ textTransform: "uppercase", letterSpacing: 1.2, fontSize: 12, opacity: 0.8, marginBottom: 8, color: "#2f86c7" }}>Radar overview</div>
-                <svg viewBox="0 0 100 100" style={{ width: "100%", height: 300, display: "block" }}>
+                <svg viewBox="0 0 100 100" className="benchmarkRadarSvg">
                   {[20, 40, 60, 80, 100].map((ring) => {
                     const radius = (ring / 100) * 38;
                     const points = radarData
@@ -879,20 +900,9 @@ export default function AthleteBenchmarksPage() {
                 </svg>
               </div>
 
-              <div style={{ display: "grid", gap: 12 }}>
+              <div className="benchmarkCategoryList">
                 {radarData.map((point) => (
-                  <div key={point.group} style={{ border: "1px solid rgba(47,134,199,0.16)", borderRadius: 16, padding: 12, background: "linear-gradient(180deg, rgba(10,11,13,0.94), rgba(18,20,24,0.94))", boxShadow: "inset 0 1px 0 rgba(47,134,199,0.05)" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ width: 10, height: 10, borderRadius: "50%", background: point.color, display: "inline-block", boxShadow: "0 0 0 2px rgba(47,134,199,0.12)" }} />
-                        <strong style={{ color: "#F8F4EA" }}>{point.label}</strong>
-                      </div>
-                      <span style={{ fontWeight: 800, color: "#2f86c7" }}>{point.value}%</span>
-                    </div>
-                    <div style={{ height: 8, borderRadius: 999, background: "rgba(255,255,255,0.06)", overflow: "hidden", marginTop: 10 }}>
-                      <div style={{ width: `${point.value}%`, height: "100%", borderRadius: 999, background: "linear-gradient(90deg, #2f86c7, #8fc9f2)" }} />
-                    </div>
-                  </div>
+                  <BenchmarkProgressRing key={point.group} label={point.label} value={point.value} color={point.color} icon={GROUP_ICONS[point.group]} />
                 ))}
               </div>
             </div>
