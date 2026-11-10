@@ -259,8 +259,8 @@ function AthleteWeekInner() {
                         marginTop: 10,
                         padding: 10,
                         borderRadius: 10,
-                        background: "rgba(100,149,237,0.15)",
-                        border: "1px solid rgba(100,149,237,0.35)",
+                        background: "rgba(47,134,199,0.12)",
+                        border: "1px solid rgba(47,134,199,0.35)",
                       }}
                     >
                       <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>Commento coach</div>

@@ -14,6 +14,7 @@ import {
   serverTimestamp,
   writeBatch,
 } from "firebase/firestore";
+import { requestPushNotifications } from "../lib/pushNotifications";
 
 type InAppNotification = {
   id: string;
@@ -29,6 +30,7 @@ export function TopBar({ title }: { title: string }) {
   const { user, profile } = useSession();
   const [notifications, setNotifications] = useState<InAppNotification[]>([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [pushStatus, setPushStatus] = useState<"idle" | "enabled" | "unsupported" | "denied">("idle");
 
   const logout = async () => {
     await signOut(auth);
@@ -113,6 +115,29 @@ export function TopBar({ title }: { title: string }) {
     await batch.commit();
   };
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if ("Notification" in window) {
+      setPushStatus(Notification.permission === "granted" ? "enabled" : Notification.permission === "denied" ? "denied" : "idle");
+    } else {
+      setPushStatus("unsupported");
+    }
+  }, [user?.uid]);
+
+  const togglePushNotifications = async () => {
+    if (!user?.uid) return;
+    const result = await requestPushNotifications(user.uid);
+    if (result.enabled) {
+      setPushStatus("enabled");
+      return;
+    }
+    if (result.reason === "denied") {
+      setPushStatus("denied");
+      return;
+    }
+    setPushStatus(result.reason === "unsupported" ? "unsupported" : "idle");
+  };
+
   return (
     <>
       <div className="topbar">
@@ -124,7 +149,10 @@ export function TopBar({ title }: { title: string }) {
             </h2>
           </div>
 
-          <div className="topbarActions" style={{ display: "flex", gap: 10 }}>
+          <div className="topbarActions" style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button onClick={togglePushNotifications} className="btn" title="Abilita notifiche push">
+              {pushStatus === "enabled" ? "Push attivo" : "Push"}
+            </button>
             <button onClick={openNotifications} className="btn" style={{ position: "relative" }}>
               Notifiche
               {unreadCount > 0 && (

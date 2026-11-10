@@ -321,6 +321,19 @@ function CoachAthletesInner() {
     return map;
   }, [athleteRows]);
 
+  const summaryMetrics = useMemo(() => {
+    const active = athleteRows.filter((row) => !row.expired).length;
+    const soon = athleteRows.filter((row) => !row.expired && row.daysUntilExpiry !== null && row.daysUntilExpiry <= 7).length;
+    const expired = athleteRows.filter((row) => row.expired).length;
+
+    return {
+      total: athleteRows.length,
+      active,
+      soon,
+      expired,
+    };
+  }, [athleteRows]);
+
   useEffect(() => {
     const loadAlreadyAssigned = async () => {
       if (!selectedTemplate || athletes.length === 0) {
@@ -482,10 +495,56 @@ function CoachAthletesInner() {
     setAthleteToDelete(athlete);
   };
 
+  const copyTeamEmails = async () => {
+    const emails = athletes
+      .map((athlete) => athlete.email)
+      .filter((email): email is string => Boolean(email && email.trim()));
+
+    if (!emails.length) {
+      setConfirmMessage("Nessuna email atleta disponibile da copiare.");
+      setConfirmType("warning");
+      return;
+    }
+
+    const payload = Array.from(new Set(emails)).join("; ");
+
+    try {
+      await navigator.clipboard.writeText(payload);
+      setConfirmMessage("Email degli atleti copiate negli appunti ✅");
+      setConfirmType("success");
+    } catch {
+      setConfirmMessage("Impossibile copiare automaticamente: seleziona le email e copiale manualmente.");
+      setConfirmType("error");
+    }
+  };
+
   return (
     <>
       <TopBar title="Gestisci Atleti" />
       <div className="container">
+        <div className="grid" style={{ marginTop: 20 }}>
+          <div className="card cardHover" style={{ background: "linear-gradient(180deg, rgba(47,134,199,0.08), rgba(12,12,13,0.96))", borderColor: "rgba(47,134,199,0.22)" }}>
+            <div className="small" style={{ color: "#2f86c7" }}>Atleti</div>
+            <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-0.04em", marginTop: 8, color: "#F8F4EA" }}>{summaryMetrics.total}</div>
+            <div className="small" style={{ marginTop: 6, color: "#a8c6d9" }}>totale squadra</div>
+          </div>
+          <div className="card cardHover" style={{ background: "linear-gradient(180deg, rgba(47,134,199,0.06), rgba(12,12,13,0.96))", borderColor: "rgba(47,134,199,0.22)" }}>
+            <div className="small" style={{ color: "#2f86c7" }}>Attivi</div>
+            <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-0.04em", marginTop: 8, color: "#F8F4EA" }}>{summaryMetrics.active}</div>
+            <div className="small" style={{ marginTop: 6, color: "#a8c6d9" }}>abbonamento regolare</div>
+          </div>
+          <div className="card cardHover" style={{ background: "linear-gradient(180deg, rgba(47,134,199,0.05), rgba(12,12,13,0.96))", borderColor: "rgba(47,134,199,0.22)" }}>
+            <div className="small" style={{ color: "#2f86c7" }}>In scadenza</div>
+            <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-0.04em", marginTop: 8, color: "#F8F4EA" }}>{summaryMetrics.soon}</div>
+            <div className="small" style={{ marginTop: 6, color: "#a8c6d9" }}>nei prossimi 7 giorni</div>
+          </div>
+          <div className="card cardHover" style={{ background: "linear-gradient(180deg, rgba(47,134,199,0.04), rgba(12,12,13,0.96))", borderColor: "rgba(47,134,199,0.22)" }}>
+            <div className="small" style={{ color: "#2f86c7" }}>Scaduti</div>
+            <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-0.04em", marginTop: 8, color: "#F8F4EA" }}>{summaryMetrics.expired}</div>
+            <div className="small" style={{ marginTop: 6, color: "#a8c6d9" }}>richiedono attenzione</div>
+          </div>
+        </div>
+
         <div className="card" style={{ marginTop: 20 }}>
           <label style={{ display: "block", fontSize: 12, opacity: 0.75, marginBottom: 8 }}>
             Cerca atleta
@@ -544,7 +603,23 @@ function CoachAthletesInner() {
             </button>
           </div>
 
-          <h2>Assegna settimana</h2>
+          <div className="row" style={{ marginTop: 16, gap: 10 }}>
+            <button className="btn btnPrimary" onClick={copyTeamEmails}>
+              Copia email atleti
+            </button>
+            <button
+              className="btn"
+              onClick={() => {
+                setSearchAthlete("");
+                setQuickFilter("all");
+                setSortMode("smart");
+              }}
+            >
+              Reset filtri
+            </button>
+          </div>
+
+          <h2 style={{ marginTop: 18 }}>Assegna settimana</h2>
           <p style={{ opacity: 0.8 }}>
             Seleziona una settimana e poi assegnala agli atleti che vuoi.
           </p>

@@ -694,7 +694,7 @@ function CoachTemplatesInner() {
               </span>
               <h3 style={{
                 margin: 0,
-                color: confirmType === 'success' ? '#4ade80' : confirmType === 'error' ? '#ef4444' : '#eab308',
+                color: confirmType === 'success' ? '#4ade80' : confirmType === 'error' ? '#ef4444' : '#8fc9f2',
               }}>
                 {confirmType === 'success' && 'Successo'}
                 {confirmType === 'error' && 'Errore'}
@@ -748,7 +748,7 @@ function CoachTemplatesInner() {
               marginBottom: 16,
             }}>
               <span style={{ fontSize: 24 }}>⚠️</span>
-              <h3 style={{ margin: 0, color: '#eab308' }}>Conferma</h3>
+              <h3 style={{ margin: 0, color: '#8fc9f2' }}>Conferma</h3>
             </div>
             <p style={{ margin: 0, marginBottom: 20, whiteSpace: 'pre-wrap' }}>{confirmMessage}</p>
             <div style={{ display: "flex", gap: 10 }}>

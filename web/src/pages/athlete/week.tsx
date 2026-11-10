@@ -43,7 +43,7 @@ export default function Week() {
             <TopBar title={week?.title || 'Settimana'} />
             <div className="container">
               {isExpired ? (
-                <div className="card" style={{ marginTop: 16, color: '#ff6b6b' }}>
+                <div className="card" style={{ marginTop: 16, color: '#2f86c7' }}>
                   Abbonamento scaduto: non puoi visualizzare le settimane.
                 </div>
               ) : (

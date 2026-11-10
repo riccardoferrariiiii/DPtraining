@@ -67,6 +67,15 @@ function AthleteHomeInner() {
     ? profile.subscriptionExpiresAt
     : null;
 
+  const athleteName = [profile?.firstName, profile?.lastName].filter(Boolean).join(" ") || "Atleta";
+  const athleteAge = profile?.dateOfBirth?.toDate?.
+    ? (() => {
+        const birth = profile.dateOfBirth.toDate();
+        const diff = Date.now() - birth.getTime();
+        return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25)));
+      })()
+    : null;
+
   const isExpired = isSubscriptionExpired(profile?.subscriptionExpiresAt);
   const daysUntilExpiry = subscriptionExpiry
     ? Math.ceil((subscriptionExpiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
@@ -93,6 +102,28 @@ function AthleteHomeInner() {
     <>
       <TopBar title="Il Mio Programma" />
       <div className="container">
+        <div className="card" style={{ marginTop: 20, display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 16, alignItems: "center" }}>
+          <img
+            src={profile?.photoUrl || "https://ui-avatars.com/api/?name=" + encodeURIComponent(athleteName) + "&background=1c5cff&color=fff&size=120"}
+            alt={athleteName}
+            style={{ width: 88, height: 88, borderRadius: "50%", objectFit: "cover", border: "2px solid rgba(255,255,255,0.12)" }}
+          />
+          <div>
+            <div style={{ opacity: 0.75, letterSpacing: 1.2, textTransform: "uppercase", fontSize: 12 }}>Profilo atleta</div>
+            <h2 style={{ margin: "6px 0 8px" }}>{athleteName}</h2>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, opacity: 0.85, fontSize: 14 }}>
+              {profile?.dateOfBirth && <span>Data nascita: {new Date(profile.dateOfBirth.toDate ? profile.dateOfBirth.toDate() : profile.dateOfBirth).toLocaleDateString("it-IT")}</span>}
+              {profile?.weightKg && <span>Peso: {profile.weightKg} kg</span>}
+              {profile?.heightCm && <span>Altezza: {profile.heightCm} cm</span>}
+              {athleteAge !== null && <span>Età: {athleteAge} anni</span>}
+            </div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <Link href="/athlete/profile" className="btn btnPrimary">Profilo</Link>
+            <Link href="/athlete/benchmarks" className="btn">Massimali</Link>
+          </div>
+        </div>
+
         {/* Subscription Status */}
         <div className="card" style={{ marginTop: 20 }}>
           <h2>Abbonamento</h2>

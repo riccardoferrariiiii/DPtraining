@@ -351,8 +351,8 @@ function CoachFilesInner() {
                               style={{
                                 padding: "6px 10px",
                                 borderRadius: 999,
-                                background: "rgba(100,149,237,0.14)",
-                                border: "1px solid rgba(100,149,237,0.3)",
+                                background: "rgba(47,134,199,0.11)",
+                                border: "1px solid rgba(47,134,199,0.3)",
                                 fontSize: 13,
                               }}
                             >

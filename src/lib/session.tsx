@@ -13,6 +13,12 @@ import { doc, onSnapshot } from "firebase/firestore";
 export type Profile = {
   email?: string;
   role?: "coach" | "athlete";
+  firstName?: string;
+  lastName?: string;
+  dateOfBirth?: any;
+  weightKg?: number | null;
+  heightCm?: number | null;
+  photoUrl?: string | null;
   subscriptionExpiresAt?: any;
 };
 

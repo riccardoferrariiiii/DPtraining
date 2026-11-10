@@ -57,7 +57,7 @@ export default async function handler(
         .json({ error: "Missing fileId, fileName, or file" });
     }
 
-    const bucket = process.env.NEXT_PUBLIC_SUPABASE_BUCKET || "shared-files";
+    const bucket = (process.env.NEXT_PUBLIC_SUPABASE_BUCKET || "shared-files").trim();
     const storagePath = `${fileId}/${fileName}`;
 
     // Read file from disk
@@ -73,7 +73,13 @@ export default async function handler(
 
     if (error) {
       console.error("Upload error:", error);
-      return res.status(400).json({ error: error.message });
+      const msg = String(error.message || "");
+      if (msg.toLowerCase().includes("bucket") && msg.toLowerCase().includes("not found")) {
+        return res.status(400).json({
+          error: `Bucket Supabase non trovato: "${bucket}". Crealo in Supabase → Storage e assicurati che sia pubblico.`,
+        });
+      }
+      return res.status(400).json({ error: msg || "Upload failed" });
     }
 
     // Generate public URL

@@ -6,13 +6,19 @@ import {
   useMemo,
   useState,
 } from "react";
-import { onAuthStateChanged, User, signOut } from "firebase/auth";
+import { onAuthStateChanged, User } from "firebase/auth";
 import { auth, db } from "./firebase";
 import { doc, onSnapshot } from "firebase/firestore";
 
 export type Profile = {
   email?: string;
   role?: "coach" | "athlete";
+  firstName?: string;
+  lastName?: string;
+  dateOfBirth?: any;
+  weightKg?: number | null;
+  heightCm?: number | null;
+  photoUrl?: string | null;
   subscriptionExpiresAt?: any;
 };
 
@@ -111,59 +117,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       ref,
       (snap) => {
         if (!snap.exists()) {
-          // Se il documento utente non esiste più (es. coach ha eliminato l'atleta),
-          // forziamo il logout: l'utente non deve più avere accesso.
-          setProfile(null);
+          setProfile({ role: "athlete", email: user.email || "" });
           setLoading(false);
-          try {
-            if (typeof window !== "undefined") {
-              window.sessionStorage.setItem(
-                "trained_login_notice",
-                JSON.stringify({
-                  message:
-                    "Il tuo account non è più attivo o è stato rimosso dal programma. Contatta il coach.",
-                })
-              );
-            }
-          } catch {
-            // ignore storage
-          }
-          try {
-            void signOut(auth);
-          } catch {
-            // Ignora errori nel signOut qui; l'onAuthStateChanged gestirà lo stato.
-          }
           return;
         }
-
-        const data = snap.data() as Profile;
-
-        // Se il profilo e' stato disabilitato (soft-delete da parte del coach),
-        // forziamo il logout immediato per rimuovere l'accesso dell'atleta.
-        if ((data as any)?.disabled) {
-          setProfile(data);
-          setLoading(false);
-          try {
-            if (typeof window !== "undefined") {
-              window.sessionStorage.setItem(
-                "trained_login_notice",
-                JSON.stringify({
-                  message: "Il tuo account è stato disattivato. Contatta il coach.",
-                })
-              );
-            }
-          } catch {
-            // ignore storage
-          }
-          try {
-            void signOut(auth);
-          } catch {
-            // Ignora errori nel signOut qui.
-          }
-          return;
-        }
-
-        setProfile(data as Profile);
+        setProfile(snap.data() as Profile);
         setLoading(false);
       },
       () => {

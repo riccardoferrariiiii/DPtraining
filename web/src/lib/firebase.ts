@@ -1,8 +1,8 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { getMessaging } from 'firebase/messaging';
 import { getStorage } from 'firebase/storage';
-import { getFunctions } from 'firebase/functions';
 
 function clean(value?: string) {
   return (value || '').trim();
@@ -21,4 +21,4 @@ export const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfi
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
-export const functions = getFunctions(app);
+export const messaging = typeof window !== 'undefined' ? getMessaging(app) : null;

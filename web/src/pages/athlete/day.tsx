@@ -119,7 +119,7 @@ function WorkoutResultForm({ athleteUid, athleteLabel, weekId, weekTitle, dayId,
                   <div className="small" style={{ marginTop: 6 }}>Le tue note: {entry.value.notes}</div>
                 )}
                 {entry.coachComment && (
-                  <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(100,149,237,0.15)' }}>
+                  <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(47,134,199,0.12)' }}>
                     <strong>Coach:</strong> {entry.coachComment}
                   </div>
                 )}
@@ -221,7 +221,7 @@ export default function Day() {
             <TopBar title={pageTitle} />
             <div className="container">
               {isExpired ? (
-                <div className="card" style={{ marginTop: 16, color: '#ff6b6b' }}>
+                <div className="card" style={{ marginTop: 16, color: '#2f86c7' }}>
                   Abbonamento scaduto: non puoi visualizzare le settimane.
                 </div>
               ) : workouts.length === 0 ? (

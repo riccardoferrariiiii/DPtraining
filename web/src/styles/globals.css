@@ -1,30 +1,38 @@
-/* DPtraining — 2026-ish UI */
+/* DPtraining — premium performance athlete dashboard */
 :root{
   color-scheme: dark;
-  --bg0:#050507;
-  --bg1:#0b0b12;
-  --stroke: rgba(255,255,255,0.12);
-  --stroke2: rgba(255,255,255,0.16);
-  --txt:#f5f5f7;
-  --muted: rgba(245,245,247,0.75);
-  --muted2: rgba(245,245,247,0.58);
-  --accent: rgba(100,149,237,0.9);
-  --accent-hover: rgba(120,169,255,1);
-  --radius: 18px;
-  --shadow-sm: 0 2px 8px rgba(0,0,0,0.15);
-  --shadow-md: 0 8px 24px rgba(0,0,0,0.25);
-  --shadow-lg: 0 16px 48px rgba(0,0,0,0.35);
-  --shadow-xl: 0 24px 64px rgba(0,0,0,0.45);
+  --bg0:#000000;
+  --bg1:#07090C;
+  --bg2:#0F1115;
+  --panel: rgba(9, 10, 12, 0.84);
+  --panel-strong: rgba(0, 0, 0, 0.96);
+  --stroke: rgba(47, 134, 199, 0.22);
+  --stroke2: rgba(47, 134, 199, 0.46);
+  --txt:#F8F4EA;
+  --muted: #a8c6d9;
+  --muted2: #8fb0c4;
+  --accent: #2f86c7;
+  --accent-strong: #8fc9f2;
+  --accent-soft: rgba(47, 134, 199, 0.12);
+  --accent-alt: #2f86c7;
+  --success: #2f86c7;
+  --warning: #2f86c7;
+  --danger: #0A0B0D;
+  --radius: 20px;
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 12px 28px rgba(0, 0, 0, 0.46);
+  --shadow-lg: 0 18px 54px rgba(0, 0, 0, 0.58);
+  --shadow-xl: 0 28px 70px rgba(0, 0, 0, 0.7);
 }
 *{box-sizing:border-box}
 html,body{padding:0;margin:0}
 body{
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
   background:
-    radial-gradient(1000px 700px at 15% 10%, rgba(100,149,237,0.08), transparent 60%),
-    radial-gradient(1000px 700px at 85% 0%, rgba(255,255,255,0.06), transparent 55%),
-    radial-gradient(900px 600px at 70% 95%, rgba(100,149,237,0.05), transparent 55%),
-    linear-gradient(180deg, var(--bg0), var(--bg1));
+    radial-gradient(1000px 700px at 15% 10%, rgba(47, 134, 199, 0.12), transparent 58%),
+    radial-gradient(900px 640px at 85% 0%, rgba(47, 134, 199, 0.06), transparent 55%),
+    radial-gradient(800px 560px at 70% 95%, rgba(47, 134, 199, 0.05), transparent 50%),
+    linear-gradient(180deg, #000000, #07090C 40%, #050608);
   color: var(--txt);
   min-height: 100vh;
 }
@@ -53,9 +61,9 @@ a{color:inherit;text-decoration:none}
   width: 32px; height: 32px; border-radius: 11px;
   background:
     radial-gradient(20px 20px at 32% 32%, rgba(255,255,255,0.5), transparent 55%),
-    linear-gradient(135deg, rgba(100,149,237,0.35), rgba(100,149,237,0.15));
-  border: 1px solid var(--stroke2);
-  box-shadow: 0 12px 32px rgba(100,149,237,0.2), inset 0 1px 0 rgba(255,255,255,0.15);
+    linear-gradient(135deg, rgba(47, 134, 199, 0.95), rgba(42, 47, 56, 0.9), rgba(174, 182, 194, 0.8));
+  border: 1px solid rgba(47, 134, 199, 0.42);
+  box-shadow: 0 12px 32px rgba(47, 134, 199, 0.18), inset 0 1px 0 rgba(255,255,255,0.12);
 }
 
 .h1{font-size: 36px; line-height: 1.08; letter-spacing:-0.03em; margin: 12px 0 8px; font-weight: 800}
@@ -69,18 +77,18 @@ a{color:inherit;text-decoration:none}
 @media (min-width:980px){ .grid{grid-template-columns: repeat(3, minmax(0,1fr)); gap:18px} }
 
 .card{
-  border: 1px solid var(--stroke);
+  border: 1px solid rgba(47, 134, 199, 0.18);
   border-radius: var(--radius);
   padding: 18px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04));
+  background: linear-gradient(180deg, rgba(12, 12, 12, 0.96), rgba(9, 11, 13, 0.96));
   box-shadow: var(--shadow-lg);
   transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
 }
 .cardHover{transition: transform .2s ease, border-color .2s ease, background .2s ease, box-shadow .2s ease;}
 .cardHover:hover{
   transform: translateY(-3px);
-  border-color: rgba(255,255,255,0.22);
-  background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.06));
+  border-color: rgba(47, 134, 199, 0.38);
+  background: linear-gradient(180deg, rgba(14, 22, 32, 0.98), rgba(9, 10, 12, 0.98));
   box-shadow: var(--shadow-xl);
 }
 .row{display:flex;gap:12px;flex-wrap:wrap}
@@ -88,9 +96,10 @@ a{color:inherit;text-decoration:none}
 
 .badge{
   font-size: 12px; padding: 5px 11px; border-radius: 999px;
-  border: 1px solid var(--stroke2);
-  background: rgba(255,255,255,0.08);
-  font-weight: 600;
+  border: 1px solid rgba(47, 134, 199, 0.38);
+  background: rgba(47, 134, 199, 0.10);
+  color: #F8F4EA;
+  font-weight: 700;
   letter-spacing: 0.01em;
 }
 
@@ -107,7 +116,7 @@ a{color:inherit;text-decoration:none}
 }
 .input:focus, .textarea:focus, select:focus{ 
   border-color: var(--accent); 
-  box-shadow: 0 0 0 3px rgba(100,149,237,0.15);
+  box-shadow: 0 0 0 3px rgba(47, 134, 199, 0.16);
   transform: translateY(-1px);
 }
 .textarea{ min-height: 140px; resize: vertical; }
@@ -120,12 +129,12 @@ a{color:inherit;text-decoration:none}
     linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04)),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Cpath fill='%23e8ecff' d='M5.5 7.5 10 12l4.5-4.5 1.5 1.5L10 15 4 9z'/%3E%3C/svg%3E") no-repeat right 12px center;
   padding-right: 42px;
-  border-color: rgba(120,169,255,0.45);
+  border-color: rgba(47,134,199,0.45);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 24px rgba(0,0,0,0.25);
 }
 
 .selectPremium option {
-  background: #0b0f1b;
+  background: #0b0b0d;
   color: #f5f5f7;
 }
 
@@ -150,14 +159,14 @@ a{color:inherit;text-decoration:none}
 .btn:active{ transform: translateY(0px); }
 .btn:disabled{opacity:.5; cursor:not-allowed; transform:none; box-shadow: none}
 .btnPrimary{
-  background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,255,255,0.88));
-  color: #000;
-  border-color: rgba(255,255,255,0.95);
-  box-shadow: 0 4px 16px rgba(255,255,255,0.15);
+  background: linear-gradient(135deg, rgba(47, 134, 199, 0.96), rgba(42, 47, 56, 0.9));
+  color: #F3F5F7;
+  border-color: rgba(47, 134, 199, 0.34);
+  box-shadow: 0 8px 22px rgba(47, 134, 199, 0.18);
 }
 .btnPrimary:hover{ 
-  background: linear-gradient(135deg, #fff, rgba(255,255,255,0.95)); 
-  box-shadow: 0 6px 24px rgba(255,255,255,0.25);
+  background: linear-gradient(135deg, rgba(105, 180, 238, 0.96), rgba(22, 24, 29, 0.92));
+  box-shadow: 0 12px 28px rgba(47, 134, 199, 0.24);
 }
 
 .btnDanger{
@@ -199,7 +208,7 @@ a{color:inherit;text-decoration:none}
 
 .quickFilterBtnActive{
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(100,149,237,0.15);
+  box-shadow: 0 0 0 3px rgba(47, 134, 199, 0.16);
 }
 
 .percentageCalcGrid{

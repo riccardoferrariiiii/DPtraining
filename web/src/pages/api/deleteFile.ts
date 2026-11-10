@@ -37,7 +37,7 @@ export default async function handler(
       return res.status(400).json({ error: "Missing storagePath" });
     }
 
-    const bucket = process.env.NEXT_PUBLIC_SUPABASE_BUCKET || "shared-files";
+    const bucket = (process.env.NEXT_PUBLIC_SUPABASE_BUCKET || "shared-files").trim();
 
     const { error } = await supabase.storage
       .from(bucket)
@@ -45,7 +45,13 @@ export default async function handler(
 
     if (error) {
       console.error("Error deleting file:", error);
-      return res.status(400).json({ error: error.message });
+      const msg = String(error.message || "");
+      if (msg.toLowerCase().includes("bucket") && msg.toLowerCase().includes("not found")) {
+        return res.status(400).json({
+          error: `Bucket Supabase non trovato: "${bucket}". Crealo in Supabase → Storage e assicurati che sia pubblico.`,
+        });
+      }
+      return res.status(400).json({ error: msg || "Delete failed" });
     }
 
     return res.status(200).json({ success: true });
