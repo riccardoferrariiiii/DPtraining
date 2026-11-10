@@ -578,6 +578,7 @@ export default function AthleteBenchmarksPage() {
   const [pendingDelete, setPendingDelete] = useState<PrItem | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [showAllQuickAdd, setShowAllQuickAdd] = useState(false);
 
   const isExpired = isSubscriptionExpired(profile?.subscriptionExpiresAt);
 
@@ -653,6 +654,7 @@ export default function AthleteBenchmarksPage() {
     setWeightKg("");
     setReps("");
     setRecordedDate(todayInputDateValue());
+    setShowAllQuickAdd(false);
     setIsModalOpen(true);
   };
 
@@ -675,6 +677,7 @@ export default function AthleteBenchmarksPage() {
     setWeightKg(typeof item.weightKg === "number" ? String(item.weightKg) : "");
     setReps(typeof item.reps === "number" ? String(item.reps) : "");
     setRecordedDate(toInputDateValue(item.recordedAt || item.updatedAt || item.createdAt) || todayInputDateValue());
+    setShowAllQuickAdd(false);
     setIsModalOpen(true);
   };
 
@@ -1024,12 +1027,13 @@ export default function AthleteBenchmarksPage() {
 
       {isModalOpen && (
         <div
-          style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(2, 6, 23, 0.92)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: 16 }}
+          className="benchmarkModalOverlay"
+          style={{ background: "rgba(2, 6, 23, 0.92)", zIndex: 9999, padding: 16 }}
           onClick={closeModal}
         >
           <div
-            className="card"
-            style={{ width: "min(96vw, 560px)", marginTop: 0, background: "linear-gradient(180deg, rgba(10,11,13,0.98), rgba(8,9,10,0.96))", border: "1px solid rgba(47,134,199,0.28)", boxShadow: "0 30px 80px rgba(0,0,0,0.78)" }}
+            className="card benchmarkModalCard"
+            style={{ background: "linear-gradient(180deg, rgba(10,11,13,0.98), rgba(8,9,10,0.96))", border: "1px solid rgba(47,134,199,0.28)", boxShadow: "0 30px 80px rgba(0,0,0,0.78)" }}
             onClick={(e) => e.stopPropagation()}
           >
             <h3 style={{ marginTop: 0 }}>{editingId ? "Modifica PR" : "Nuovo PR"}</h3>
@@ -1043,6 +1047,7 @@ export default function AthleteBenchmarksPage() {
                   const next = e.target.value as BenchmarkGroup;
                   setCategory(next);
                   setKind(BENCHMARK_LIBRARY[next][0]?.kind ?? "time");
+                  setShowAllQuickAdd(false);
                 }}
               >
                 {GROUP_ORDER.map((group) => (
@@ -1050,20 +1055,23 @@ export default function AthleteBenchmarksPage() {
                 ))}
               </select>
             </div>
-
             <div style={{ marginTop: 12 }}>
               <label style={{ fontSize: 12, opacity: 0.75, display: "block", marginBottom: 6 }}>Nome benchmark</label>
               <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Fran, Back Squat, Murph..." />
             </div>
-
             <div style={{ marginTop: 12 }}>
               <label style={{ fontSize: 12, opacity: 0.75, display: "block", marginBottom: 6 }}>Quick add</label>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {GROUP_META[category].examples.map((exercise) => (
+              <div className="benchmarkQuickAdd">
+                {GROUP_META[category].examples.slice(0, showAllQuickAdd ? undefined : 6).map((exercise) => (
                   <button key={`${category}-${exercise}`} className="btn" style={{ padding: "8px 10px", fontSize: 12 }} onClick={() => handlePreset(exercise, category)}>
                     {exercise}
                   </button>
                 ))}
+                {GROUP_META[category].examples.length > 6 && (
+                  <button className="btn benchmarkQuickAddMore" onClick={() => setShowAllQuickAdd((value) => !value)}>
+                    {showAllQuickAdd ? "Mostra meno" : `Mostra altri (${GROUP_META[category].examples.length - 6})`}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1078,7 +1086,7 @@ export default function AthleteBenchmarksPage() {
 
             <div style={{ marginTop: 12 }}>
               <label style={{ fontSize: 12, opacity: 0.75, display: "block", marginBottom: 6 }}>Data registrazione</label>
-              <input className="input" type="date" max={todayInputDateValue()} value={recordedDate} onChange={(e) => setRecordedDate(e.target.value)} />
+              <input className="input benchmarkModalDate" type="date" max={todayInputDateValue()} value={recordedDate} onChange={(e) => setRecordedDate(e.target.value)} />
             </div>
 
             {kind === "time" && (
